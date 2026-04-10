@@ -8,6 +8,7 @@
 - Risk engine rejects stale data, kill switch, duplicate client order ids, price band violations, and excessive notional.
 - Order state machine handles accepted, partially filled, filled, canceled, rejected, and unknown states.
 - OKX REST client sends demo signed place/cancel/query requests through mock transport.
+- OKX WebSocket message builders and parsers cover login payloads, subscriptions, heartbeat, order-channel updates, and resubscribe planning.
 - Trading engine quantizes strategy intents before risk evaluation and submission.
 
 ## OKX Demo Integration Tests

@@ -20,12 +20,13 @@ Completed:
 
 - Deterministic tests for config, signing, metadata, risk, order lifecycle, reconciliation, market data parsing, OKX order mapping, REST request construction, persistence, metrics, and engine coordination.
 - OKX REST methods for place order, cancel order, get order state, and fetch one spot instrument.
+- OKX WebSocket message builders for login, ticker subscribe, orders subscribe, heartbeat checks, order-channel parsing, and resubscribe planning.
 - Credential-gated integration placeholder that skips without local OKX Demo credentials.
 
 Remaining:
 
 - Real OKX Demo connectivity test for server time and instrument metadata.
-- WebSocket public/private client loop with reconnect and resubscribe behavior.
+- WebSocket public/private network loop that applies the existing login, subscribe, heartbeat, parser, and resubscribe primitives.
 - Full balance/fill reconciliation.
 - Replay/paper runner.
 - Prometheus exporter and alerting integration.

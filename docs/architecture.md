@@ -18,7 +18,7 @@ The MVP targets OKX Spot Demo for a single spot instrument and a low-frequency s
 
 ## Implemented Slice
 
-The current codebase implements the deterministic core for config safety gates, OKX signing, spot instrument parsing, order payload mapping, REST place/cancel/query methods, ticker parsing, order state transitions, reconciliation by order state query, event persistence, metrics counters, and a breakout strategy shell.
+The current codebase implements the deterministic core for config safety gates, OKX signing, spot instrument parsing, order payload mapping, REST place/cancel/query methods, WebSocket login/subscribe payloads, WebSocket heartbeat decisions, ticker and order-channel parsing, resubscribe planning, order state transitions, reconciliation by order state query, event persistence, metrics counters, and a breakout strategy shell.
 
 No live OKX Demo request is executed by default. Integration tests are credential-gated.
 
