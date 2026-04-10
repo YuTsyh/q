@@ -23,3 +23,14 @@ The MVP uses:
 
 `MultiFactorPerpStrategy.default_low_frequency` computes factor features, combines cross-sectional ranks, and produces target weights through an equal-weight top-N constructor.
 
+## Research References
+
+The strategy track uses [awesome-systematic-trading](https://github.com/wangzhe3224/awesome-systematic-trading) as a source index. Current design references are documented in `docs/research-sources.md`.
+
+Current constraints remain unchanged:
+
+- No high-frequency strategy.
+- No market making.
+- No cross-exchange arbitrage.
+- No alternative data.
+- No dependency on real OKX connectivity during strategy research.

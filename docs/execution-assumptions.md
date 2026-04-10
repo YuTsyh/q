@@ -30,3 +30,10 @@ abs(fill_notional) * taker_fee_rate
 
 This is a deterministic research assumption model, not a full exchange simulator. It does not yet model queue position, order book depth, maker fill probability, funding cashflows, liquidation, margin requirements, or trading halts.
 
+## Next Required Extensions
+
+- Funding cashflow accounting for perpetual swaps.
+- Rebalance schedule accounting for 4h and 1d modes.
+- Turnover and fee attribution by rebalance.
+- Conservative missing-data handling.
+- Walk-forward reporting.
