@@ -22,6 +22,10 @@ The current codebase implements the deterministic core for config safety gates, 
 
 No live OKX Demo request is executed by default. Integration tests are credential-gated.
 
+OKX WebSocket work is intentionally capped at the minimum live-execution skeleton: connect, login, subscribe, ping/pong heartbeat, reconnect, resubscribe, order channel event parsing, and deterministic fake-WebSocket tests. Further connectivity expansion is out of scope unless strategy execution requires it.
+
+Research work is now the main line: OHLCV, funding, instrument metadata, fee/tick/lot/minimum constraints, universe filtering, factor generation, cross-sectional ranking, portfolio construction, and replay execution simulation.
+
 ## Recovery
 
 On restart, the bot must load local open orders, fetch OKX pending orders, compare by `ordId` and `clOrdId`, mark unknown local orders for reconciliation, and block new orders until the reconciliation pass finishes.
