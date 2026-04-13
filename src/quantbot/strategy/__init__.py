@@ -1,2 +1,1 @@
 """Strategy interfaces and implementations."""
-
