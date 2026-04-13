@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Callable
 
 from quantbot.research.data import FundingRate, OhlcvBar
 
@@ -206,7 +207,7 @@ def create_ensemble_allocator(
     top_n: int = 3,
     gross_exposure: float = 1.0,
     min_trend_strength: float = 0.5,
-) -> callable:
+) -> Callable:
     """Factory function to create ensemble allocator for backtesting."""
     config = EnsembleConfig(
         fast_ema=fast_ema,

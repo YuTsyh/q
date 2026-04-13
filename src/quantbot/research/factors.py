@@ -24,6 +24,8 @@ class MomentumFactor:
             raise ValueError("not enough bars for momentum")
         start = bars[-self.lookback - 1].close
         end = bars[-1].close
+        if start <= 0:
+            return Decimal("0")
         return end / start - Decimal("1")
 
 
@@ -37,6 +39,8 @@ class TrendFactor:
             raise ValueError("not enough bars for trend")
         recent = bars[-self.lookback :]
         average = sum((bar.close for bar in recent), Decimal("0")) / Decimal(len(recent))
+        if average <= 0:
+            return Decimal("0")
         return bars[-1].close / average - Decimal("1")
 
 

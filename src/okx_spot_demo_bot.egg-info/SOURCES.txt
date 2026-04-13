@@ -52,6 +52,7 @@ src/quantbot/strategy/adaptive_momentum.py
 src/quantbot/strategy/base.py
 src/quantbot/strategy/breakout.py
 src/quantbot/strategy/ensemble.py
+src/quantbot/strategy/mean_reversion_markov.py
 src/quantbot/strategy/regime_switching.py
 src/quantbot/strategy/trend_following.py
 tests/test_adaptive_momentum.py
@@ -66,6 +67,7 @@ tests/test_live_risk.py
 tests/test_market_data.py
 tests/test_market_impact.py
 tests/test_markov_regime.py
+tests/test_mean_reversion_markov.py
 tests/test_metrics.py
 tests/test_multifactor_strategy.py
 tests/test_okx_auth.py

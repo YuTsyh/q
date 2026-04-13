@@ -24,6 +24,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Callable
 
 from quantbot.research.data import FundingRate, OhlcvBar
 
@@ -172,7 +173,7 @@ def create_trend_following_allocator(
     atr_period: int = 10,
     stop_loss_atr: float = 2.0,
     gross_exposure: float = 1.0,
-) -> callable:
+) -> Callable:
     """Factory function to create trend-following allocator for backtesting."""
     config = TrendFollowConfig(
         fast_ema_period=fast_ema,
