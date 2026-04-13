@@ -1,4 +1,3 @@
-README.md
 pyproject.toml
 src/okx_spot_demo_bot.egg-info/PKG-INFO
 src/okx_spot_demo_bot.egg-info/SOURCES.txt
@@ -64,6 +63,7 @@ tests/test_config.py
 tests/test_cross_sectional_arb.py
 tests/test_crypto_factors.py
 tests/test_engine.py
+tests/test_enhanced_features.py
 tests/test_ensemble.py
 tests/test_execution_simulator.py
 tests/test_instruments.py
