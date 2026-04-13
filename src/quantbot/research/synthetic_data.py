@@ -121,6 +121,41 @@ FULL_CYCLE_REGIMES = [BULL_MARKET, BEAR_MARKET, SIDEWAYS_MARKET, VOLATILE_MARKET
 MULTI_CYCLE_REGIMES = FULL_CYCLE_REGIMES * 2
 """Two full market cycles for longer backtests (780 bars)."""
 
+# ---------------------------------------------------------------------------
+# Extended regime sets for 3+ year OOS validation (1095+ bars)
+# ---------------------------------------------------------------------------
+
+# More realistic crypto market regime durations and magnitudes.
+# Calibrated to approximate BTC/ETH historical characteristics:
+# - Bull markets: annualised drift ~100-200%, daily vol ~3-4%
+# - Bear markets: annualised drift ~-50-80%, daily vol ~4-5%
+# - Crashes: sharp drawdowns with extreme vol
+# - Sideways: low drift, compressed volatility
+DEEP_BEAR = MarketRegime("deep_bear", drift=-0.002, volatility=0.04, duration_bars=120)
+ACCUMULATION = MarketRegime("accumulation", drift=0.0005, volatility=0.02, duration_bars=90)
+STRONG_BULL = MarketRegime("strong_bull", drift=0.003, volatility=0.03, duration_bars=130)
+DISTRIBUTION = MarketRegime("distribution", drift=-0.0003, volatility=0.035, duration_bars=70)
+CRASH = MarketRegime("crash", drift=-0.005, volatility=0.06, duration_bars=30)
+RECOVERY = MarketRegime("recovery", drift=0.004, volatility=0.035, duration_bars=50)
+
+THREE_YEAR_REGIMES = [
+    STRONG_BULL,        # 130 bars - early bull market
+    DISTRIBUTION,       # 70 bars  - topping pattern
+    DEEP_BEAR,          # 120 bars - bear market
+    CRASH,              # 30 bars  - capitulation event
+    ACCUMULATION,       # 90 bars  - bottoming phase
+    RECOVERY,           # 50 bars  - recovery rally
+    BULL_MARKET,        # 100 bars - moderate bull
+    SIDEWAYS_MARKET,    # 60 bars  - consolidation
+    VOLATILE_MARKET,    # 50 bars  - high vol expansion
+    STRONG_BULL,        # 130 bars - late bull
+    DISTRIBUTION,       # 70 bars  - second distribution
+    BEAR_MARKET,        # 80 bars  - correction
+    RECOVERY,           # 50 bars  - bounce
+    ACCUMULATION,       # 90 bars  - re-accumulation
+]
+"""3+ year regime sequence (1120 bars) covering bull, deep bear, crash, recovery."""
+
 
 def generate_multi_instrument_data(
     inst_ids: list[str],
