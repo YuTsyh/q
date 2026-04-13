@@ -33,21 +33,21 @@ from quantbot.research.regime import MarketRegimeType, classify_regime
 class EnsembleConfig:
     """Configuration for ensemble strategy."""
 
-    fast_ema: int = 5
-    slow_ema: int = 15
-    momentum_lookback: int = 10
+    fast_ema: int = 3
+    slow_ema: int = 10
+    momentum_lookback: int = 7
     vol_lookback: int = 15
     atr_period: int = 10
-    trend_ma_lookbacks: tuple[int, ...] = (5, 10, 20)
+    trend_ma_lookbacks: tuple[int, ...] = (3, 7, 14)
     min_trend_strength: float = 0.5  # At least half of MAs must confirm
-    vol_target: float = 0.12
-    max_position_weight: float = 0.15
-    gross_exposure: float = 0.5
+    vol_target: float = 0.18
+    max_position_weight: float = 0.20
+    gross_exposure: float = 0.7
     stop_loss_atr_multiple: float = 1.5
     top_n: int = 3  # Max instruments
     use_regime_filter: bool = True
     crash_lookback: int = 3
-    crash_threshold: float = -0.03
+    crash_threshold: float = -0.04
 
 
 def _ema(values: list[float], period: int) -> list[float]:
@@ -241,13 +241,13 @@ class EnsembleMomentumTrend:
 
 
 def create_ensemble_allocator(
-    fast_ema: int = 5,
-    slow_ema: int = 15,
-    momentum_lookback: int = 10,
-    vol_target: float = 0.12,
+    fast_ema: int = 3,
+    slow_ema: int = 10,
+    momentum_lookback: int = 7,
+    vol_target: float = 0.18,
     stop_loss_atr: float = 1.5,
     top_n: int = 3,
-    gross_exposure: float = 0.5,
+    gross_exposure: float = 0.7,
     min_trend_strength: float = 0.5,
 ) -> Callable:
     """Factory function to create ensemble allocator for backtesting."""

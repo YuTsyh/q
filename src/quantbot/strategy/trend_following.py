@@ -34,18 +34,18 @@ from quantbot.research.regime import MarketRegimeType, classify_regime
 class TrendFollowConfig:
     """Configuration for trend following strategy."""
 
-    fast_ema_period: int = 5
-    slow_ema_period: int = 20
+    fast_ema_period: int = 3
+    slow_ema_period: int = 12
     atr_period: int = 10
-    vol_lookback: int = 20
-    vol_target: float = 0.12  # 12% annualised target vol per position
-    max_position_weight: float = 0.15
+    vol_lookback: int = 15
+    vol_target: float = 0.20  # 20% annualised target vol per position
+    max_position_weight: float = 0.20
     stop_loss_atr_multiple: float = 1.5
-    min_trend_strength: float = 0.01  # Positive absolute momentum required
-    gross_exposure: float = 0.6
+    min_trend_strength: float = 0.005
+    gross_exposure: float = 0.8
     annualisation_factor: float = 365.0  # For crypto daily bars
     use_regime_filter: bool = True
-    drawdown_threshold: float = 0.03
+    drawdown_threshold: float = 0.04
     crash_lookback: int = 3
 
 
@@ -220,12 +220,12 @@ class VolatilityAdjustedTrendFollower:
 
 
 def create_trend_following_allocator(
-    fast_ema: int = 5,
-    slow_ema: int = 20,
-    vol_target: float = 0.12,
+    fast_ema: int = 3,
+    slow_ema: int = 12,
+    vol_target: float = 0.20,
     atr_period: int = 10,
     stop_loss_atr: float = 1.5,
-    gross_exposure: float = 0.6,
+    gross_exposure: float = 0.8,
 ) -> Callable:
     """Factory function to create trend-following allocator for backtesting."""
     config = TrendFollowConfig(

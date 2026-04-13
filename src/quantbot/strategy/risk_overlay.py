@@ -59,13 +59,13 @@ class RiskOverlayConfig:
         Instruments with lower liquidity are excluded.
     """
 
-    max_gross_exposure: float = 0.5
-    max_per_instrument: float = 0.15
+    max_gross_exposure: float = 0.7
+    max_per_instrument: float = 0.20
     drawdown_lookback: int = 20
-    drawdown_threshold: float = 0.02
-    drawdown_flat_threshold: float = 0.08
+    drawdown_threshold: float = 0.04
+    drawdown_flat_threshold: float = 0.12
     crash_guard_lookback: int = 3
-    crash_guard_threshold: float = -0.03
+    crash_guard_threshold: float = -0.05
     regime_gating: bool = True
     regime_exposure: dict[str, float] | None = None
     min_adv_ratio: float = 0.0
