@@ -93,6 +93,7 @@ class BacktestEngine:
         weights_history: list[dict[str, float]] = []
         current_weights: dict[str, Decimal] = {}
         bar_count = 0
+        last_rebalance_equity = equity  # Track equity at last rebalance
 
         for t_idx in range(min_history, len(all_timestamps)):
             bar_count += 1
@@ -131,6 +132,11 @@ class BacktestEngine:
 
             # Rebalance at interval
             if bar_count % self._config.rebalance_every_n_bars == 0:
+                # Record rebalance-to-rebalance return (trade-level)
+                if last_rebalance_equity > 0 and current_weights:
+                    rebal_ret = equity / last_rebalance_equity - 1.0
+                    trade_returns.append(rebal_ret)
+
                 try:
                     target_weights = allocator(sliced_bars, sliced_funding)
                 except (ValueError, ZeroDivisionError):
@@ -145,37 +151,30 @@ class BacktestEngine:
                     )
                     total_fees = sum(float(f.fee) for f in fills)
                     equity -= total_fees
-
-                    # Record trade returns
-                    for f in fills:
-                        notional = float(f.notional)
-                        fee = float(f.fee)
-                        if abs(notional) > 0:
-                            trade_ret = -fee / abs(notional)  # Cost drag per trade
-                            trade_returns.append(trade_ret)
-
                     current_weights = target_weights
+
+                last_rebalance_equity = equity
 
             equity_curve.append(max(equity, 0.0))
             timestamps.append(ts)
             weights_history.append({k: float(v) for k, v in current_weights.items()})
 
-        # Compute trade-level returns from equity curve changes
-        period_trade_returns = []
+        # Compute period returns for Sharpe/equity metrics
+        period_returns = []
         for i in range(1, len(equity_curve)):
             if equity_curve[i - 1] > 0:
                 r = equity_curve[i] / equity_curve[i - 1] - 1.0
-                period_trade_returns.append(r)
+                period_returns.append(r)
 
         metrics = compute_metrics(
             equity_curve=equity_curve,
-            trade_returns=period_trade_returns,
+            trade_returns=trade_returns if trade_returns else period_returns,
             periods_per_year=self._config.periods_per_year,
         )
 
         return BacktestResult(
             equity_curve=equity_curve,
-            trade_returns=period_trade_returns,
+            trade_returns=period_returns,
             timestamps=timestamps,
             weights_history=weights_history,
             metrics=metrics,
