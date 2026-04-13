@@ -27,6 +27,7 @@ from quantbot.research.factors import (
     Factor,
     WeightedFactorScorer,
 )
+from quantbot.research.regime import MarketRegimeType, classify_regime
 from quantbot.research.vol_factors import (
     DualMomentumFactor,
     TrendStrengthFactor,
@@ -103,7 +104,7 @@ class AdaptiveDualMomentumStrategy:
         cls,
         *,
         top_n: int = 3,
-        gross_exposure: Decimal = Decimal("1.0"),
+        gross_exposure: Decimal = Decimal("0.5"),
         momentum_lookback: int = 5,
         vol_lookback: int = 10,
     ) -> AdaptiveDualMomentumStrategy:
@@ -126,7 +127,7 @@ class AdaptiveDualMomentumStrategy:
             portfolio_constructor=InverseVolWeightConstructor(
                 top_n=top_n,
                 gross_exposure=gross_exposure,
-                max_symbol_weight=Decimal("0.4"),
+                max_symbol_weight=Decimal("0.15"),
             ),
             vol_lookback=vol_lookback,
             trend_filter_threshold=Decimal("0.4"),
@@ -138,6 +139,11 @@ class AdaptiveDualMomentumStrategy:
         funding_by_instrument: dict[str, list[FundingRate]],
     ) -> dict[str, Decimal]:
         """Compute target portfolio weights."""
+        # --- Regime filter: reduce exposure in bear/crisis ---
+        regime_scale = self._compute_regime_scale(bars_by_instrument)
+        if regime_scale <= 0:
+            return {}
+
         features: dict[str, dict[str, Decimal]] = {}
         volatilities: dict[str, float] = {}
 
@@ -170,7 +176,39 @@ class AdaptiveDualMomentumStrategy:
             return {}
 
         scores = self.scorer.score(features)
-        return self.portfolio_constructor.construct(scores, volatilities)
+        raw_weights = self.portfolio_constructor.construct(scores, volatilities)
+
+        # Apply regime scaling to final weights
+        if regime_scale < 1.0:
+            raw_weights = {
+                k: Decimal(str(round(float(v) * regime_scale, 6)))
+                for k, v in raw_weights.items()
+                if float(v) * regime_scale > 1e-6
+            }
+        return raw_weights
+
+    def _compute_regime_scale(
+        self,
+        bars_by_instrument: dict[str, list[OhlcvBar]],
+    ) -> float:
+        """Classify regime and return exposure multiplier."""
+        best_bars: list[OhlcvBar] = []
+        for bars in bars_by_instrument.values():
+            if len(bars) > len(best_bars):
+                best_bars = bars
+        if len(best_bars) < 51:
+            return 1.0
+        try:
+            regime = classify_regime(best_bars)
+            regime_map = {
+                MarketRegimeType.BULL_TRENDING: 1.0,
+                MarketRegimeType.RANGE_BOUND: 0.5,
+                MarketRegimeType.BEAR_TRENDING: 0.0,
+                MarketRegimeType.HIGH_VOL_CRISIS: 0.0,
+            }
+            return regime_map.get(regime.regime, 0.5)
+        except (ValueError, ZeroDivisionError):
+            return 0.5
 
     def _compute_volatility(self, bars: list[OhlcvBar]) -> float:
         """Compute annualised volatility from bars."""
@@ -191,7 +229,7 @@ class AdaptiveDualMomentumStrategy:
 
 def create_adaptive_dual_momentum_allocator(
     top_n: int = 3,
-    gross_exposure: float = 1.0,
+    gross_exposure: float = 0.5,
     momentum_lookback: int = 5,
     vol_lookback: int = 10,
 ) -> Callable:

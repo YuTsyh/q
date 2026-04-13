@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
 
 from quantbot.research.market_impact import (
     EnhancedExecutionSimulator,
