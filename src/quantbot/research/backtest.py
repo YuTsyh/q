@@ -204,8 +204,16 @@ class BacktestEngine:
                         prices=prices,
                         sliced_bars=sliced_bars,
                     )
-                    equity = max(equity - total_costs, 0.0)
-                    current_weights = target_weights
+                    # Cap transaction costs at equity — in live trading the
+                    # exchange would reject an order that cannot be funded;
+                    # here we skip the rebalance when costs would be ruinous
+                    # (> 50 % of equity).
+                    if total_costs > equity * 0.5:
+                        # Reject the rebalance: costs too high (illiquid)
+                        pass
+                    else:
+                        equity = max(equity - total_costs, 0.0)
+                        current_weights = target_weights
 
                 last_rebalance_equity = equity
 

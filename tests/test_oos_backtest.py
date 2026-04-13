@@ -1,0 +1,246 @@
+"""Phase 2 – Comprehensive OOS backtesting of ALL strategies.
+
+Runs every strategy in the repository through a 3-year OOS backtest
+with realistic market frictions (Almgren-Chriss impact, OKX fees,
+volume caps) and compiles a performance matrix.
+
+The test collects results but does NOT assert pass/fail on performance
+thresholds — that diagnostic is handled by the report generation.
+Instead, each test validates that:
+ • The strategy runs without error on 3-year data.
+ • Produces valid equity curves and trade returns.
+ • Returns a PerformanceMetrics object.
+"""
+
+from __future__ import annotations
+
+from decimal import Decimal
+
+import pytest
+
+from quantbot.research.backtest import BacktestConfig, BacktestEngine
+from quantbot.research.synthetic_data import (
+    DEFAULT_NOISE_CONFIG,
+    THREE_YEAR_REGIMES,
+    generate_multi_instrument_data,
+)
+
+# Strategies
+from quantbot.strategy.trend_following import create_trend_following_allocator
+from quantbot.strategy.adaptive_momentum import create_adaptive_dual_momentum_allocator
+from quantbot.strategy.ensemble import create_ensemble_allocator
+from quantbot.strategy.regime_switching import create_regime_switching_allocator
+from quantbot.strategy.mean_reversion_markov import create_mean_reversion_markov_allocator
+from quantbot.strategy.vol_mean_reversion import create_vol_mean_reversion_allocator
+from quantbot.strategy.cross_sectional_arb import create_cross_sectional_arb_allocator
+from quantbot.strategy.microstructure_flow import create_microstructure_flow_allocator
+
+
+# ---------------------------------------------------------------------------
+# Shared fixtures
+# ---------------------------------------------------------------------------
+
+INSTRUMENTS = ["BTC-USDT", "ETH-USDT", "SOL-USDT", "BNB-USDT", "XRP-USDT"]
+
+
+@pytest.fixture(scope="module")
+def three_year_data():
+    """Generate 3-year multi-instrument data with realistic noise."""
+    bars, funding = generate_multi_instrument_data(
+        inst_ids=INSTRUMENTS,
+        regimes=THREE_YEAR_REGIMES,
+        seed_base=42,
+        noise_config=DEFAULT_NOISE_CONFIG,
+        correlation=0.6,
+    )
+    return bars, funding
+
+
+@pytest.fixture(scope="module")
+def strict_config():
+    """Strict OOS backtest config with realistic frictions."""
+    return BacktestConfig(
+        initial_equity=100_000.0,
+        rebalance_every_n_bars=1,
+        taker_fee_rate=0.0005,
+        slippage_bps=2.0,
+        partial_fill_ratio=1.0,
+        periods_per_year=365.0,
+        use_market_impact=True,
+    )
+
+
+def _run_strategy(allocator, bars, funding, config, min_hist=20):
+    """Helper to run a strategy and return its BacktestResult."""
+    engine = BacktestEngine(config)
+    return engine.run(allocator, bars, funding, min_history=min_hist)
+
+
+# ---------------------------------------------------------------------------
+# Strategy backtest tests
+# ---------------------------------------------------------------------------
+
+class TestTrendFollowingOOS:
+    def test_runs_without_error(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_trend_following_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert len(result.equity_curve) > 100
+        assert result.metrics.total_trades >= 0
+
+    def test_equity_curve_positive(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_trend_following_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert all(e >= 0 for e in result.equity_curve)
+
+
+class TestAdaptiveMomentumOOS:
+    def test_runs_without_error(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_adaptive_dual_momentum_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert len(result.equity_curve) > 100
+
+    def test_equity_curve_positive(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_adaptive_dual_momentum_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert all(e >= 0 for e in result.equity_curve)
+
+
+class TestEnsembleOOS:
+    def test_runs_without_error(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_ensemble_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert len(result.equity_curve) > 100
+
+    def test_equity_curve_positive(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_ensemble_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert all(e >= 0 for e in result.equity_curve)
+
+
+class TestRegimeSwitchingOOS:
+    def test_runs_without_error(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_regime_switching_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert len(result.equity_curve) > 100
+
+    def test_equity_curve_positive(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_regime_switching_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert all(e >= 0 for e in result.equity_curve)
+
+
+class TestMeanReversionMarkovOOS:
+    def test_runs_without_error(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_mean_reversion_markov_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert len(result.equity_curve) > 100
+
+    def test_equity_curve_positive(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_mean_reversion_markov_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert all(e >= 0 for e in result.equity_curve)
+
+
+class TestVolMeanReversionOOS:
+    def test_runs_without_error(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_vol_mean_reversion_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert len(result.equity_curve) > 100
+
+    def test_equity_curve_positive(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_vol_mean_reversion_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert all(e >= 0 for e in result.equity_curve)
+
+
+class TestCrossSectionalArbOOS:
+    def test_runs_without_error(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_cross_sectional_arb_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert len(result.equity_curve) > 100
+
+    def test_equity_curve_positive(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_cross_sectional_arb_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert all(e >= 0 for e in result.equity_curve)
+
+
+class TestMicrostructureFlowOOS:
+    def test_runs_without_error(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_microstructure_flow_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert len(result.equity_curve) > 100
+
+    def test_equity_curve_positive(self, three_year_data, strict_config):
+        bars, funding = three_year_data
+        allocator = create_microstructure_flow_allocator()
+        result = _run_strategy(allocator, bars, funding, strict_config)
+        assert all(e >= 0 for e in result.equity_curve)
+
+
+# ---------------------------------------------------------------------------
+# Performance matrix report
+# ---------------------------------------------------------------------------
+
+class TestPerformanceReport:
+    """Generate a combined performance matrix for all strategies."""
+
+    STRATEGY_FACTORIES = {
+        "trend_following": create_trend_following_allocator,
+        "adaptive_momentum": create_adaptive_dual_momentum_allocator,
+        "ensemble": create_ensemble_allocator,
+        "regime_switching": create_regime_switching_allocator,
+        "mean_reversion_markov": create_mean_reversion_markov_allocator,
+        "vol_mean_reversion": create_vol_mean_reversion_allocator,
+        "cross_sectional_arb": create_cross_sectional_arb_allocator,
+        "microstructure_flow": create_microstructure_flow_allocator,
+    }
+
+    def test_all_strategies_produce_metrics(self, three_year_data, strict_config):
+        """Run all strategies and ensure each returns valid metrics."""
+        bars, funding = three_year_data
+        engine = BacktestEngine(strict_config)
+
+        results = {}
+        for name, factory in self.STRATEGY_FACTORIES.items():
+            allocator = factory()
+            result = engine.run(allocator, bars, funding, min_history=20)
+            results[name] = result.metrics
+            # Must have valid numeric metrics
+            assert result.metrics.sharpe_ratio is not None
+            assert result.metrics.max_drawdown is not None
+            assert result.metrics.cagr is not None
+
+        # Print the performance matrix for diagnostic
+        header = (
+            f"{'Strategy':<25} | {'CAGR':>8} | {'MaxDD':>8} | {'Sharpe':>8} | "
+            f"{'Sortino':>8} | {'WinRate':>8} | {'PF':>8} | {'Trades':>8}"
+        )
+        print("\n" + "=" * len(header))
+        print("PERFORMANCE MATRIX – 3-Year OOS (Strict Frictions)")
+        print("=" * len(header))
+        print(header)
+        print("-" * len(header))
+        for name, m in results.items():
+            print(
+                f"{name:<25} | {m.cagr:>8.2%} | {m.max_drawdown:>8.2%} | "
+                f"{m.sharpe_ratio:>8.2f} | {m.sortino_ratio:>8.2f} | "
+                f"{m.win_rate:>8.2%} | {m.profit_factor:>8.2f} | "
+                f"{m.total_trades:>8}"
+            )
+        print("=" * len(header))

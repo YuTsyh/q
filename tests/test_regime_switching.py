@@ -81,7 +81,7 @@ class TestRegimeSwitchingAlpha:
     def test_successive_calls_update_state(self, full_cycle_8):
         bars, funding = full_cycle_8
         strategy = RegimeSwitchingAlpha()
-        w1 = strategy.allocate(bars, funding)
+        strategy.allocate(bars, funding)
         w2 = strategy.allocate(bars, funding)
         # Second call should still return valid weights
         assert isinstance(w2, dict)

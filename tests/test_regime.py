@@ -17,8 +17,6 @@ from quantbot.research.regime import (
     classify_regime,
 )
 from quantbot.research.synthetic_data import (
-    BULL_MARKET,
-    BEAR_MARKET,
     FULL_CYCLE_REGIMES,
     MarketRegime,
     generate_multi_instrument_data,
