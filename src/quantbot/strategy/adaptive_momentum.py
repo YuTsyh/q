@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Callable
 
 from quantbot.research.data import FundingRate, OhlcvBar
 from quantbot.research.factors import (
@@ -193,7 +194,7 @@ def create_adaptive_dual_momentum_allocator(
     gross_exposure: float = 1.0,
     momentum_lookback: int = 5,
     vol_lookback: int = 10,
-) -> callable:
+) -> Callable:
     """Factory function to create an allocator callable for backtesting."""
     strategy = AdaptiveDualMomentumStrategy.default(
         top_n=top_n,

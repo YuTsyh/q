@@ -52,6 +52,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Callable
 
 from quantbot.research.crypto_factors import (
     BollingerBandWidthFactor,
@@ -452,7 +453,7 @@ def create_mean_reversion_markov_allocator(
     crisis_exposure: float = 0.0,
     dd_threshold: float = 0.05,
     circuit_breaker_drop: float = 0.05,
-) -> callable:
+) -> Callable:
     """Factory producing an allocator callable for :class:`BacktestEngine`.
 
     All numeric arguments are ``float`` so that the perturbation-robustness

@@ -50,10 +50,13 @@ def compute_metrics(
         raise ValueError("equity_curve must have at least 2 values")
 
     # --- Period returns ---
-    period_returns = [
-        (equity_curve[i] / equity_curve[i - 1]) - 1.0
-        for i in range(1, len(equity_curve))
-    ]
+    period_returns = []
+    for i in range(1, len(equity_curve)):
+        if equity_curve[i - 1] > 0:
+            period_returns.append((equity_curve[i] / equity_curve[i - 1]) - 1.0)
+        else:
+            # Equity wiped out; treat subsequent returns as zero.
+            period_returns.append(0.0)
 
     n_periods = len(period_returns)
     total_return = equity_curve[-1] / equity_curve[0] - 1.0

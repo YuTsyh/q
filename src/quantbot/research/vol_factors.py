@@ -102,7 +102,7 @@ class MeanReversionFactor:
             raise ValueError("not enough bars for mean reversion")
         recent = bars[-self.lookback:]
         sma = sum((b.close for b in recent), Decimal("0")) / Decimal(len(recent))
-        if bars[-1].close == 0:
+        if bars[-1].close <= 0:
             return Decimal("0")
         # Positive when price below SMA (oversold)
         return sma / bars[-1].close - Decimal("1")

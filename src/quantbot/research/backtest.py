@@ -128,7 +128,7 @@ class BacktestEngine:
                             if prev_price > 0:
                                 ret = (curr_price - prev_price) / prev_price
                                 pnl += Decimal(str(equity)) * weight * ret
-                equity += float(pnl)
+                equity = max(equity + float(pnl), 0.0)
 
             # Rebalance at interval
             if bar_count % self._config.rebalance_every_n_bars == 0:
@@ -142,7 +142,7 @@ class BacktestEngine:
                 except (ValueError, ZeroDivisionError):
                     target_weights = {}
 
-                if target_weights:
+                if target_weights and equity > 0:
                     fills = self._simulator.rebalance(
                         equity=Decimal(str(equity)),
                         current_weights=current_weights,
@@ -150,7 +150,7 @@ class BacktestEngine:
                         prices=prices,
                     )
                     total_fees = sum(float(f.fee) for f in fills)
-                    equity -= total_fees
+                    equity = max(equity - total_fees, 0.0)
                     current_weights = target_weights
 
                 last_rebalance_equity = equity
@@ -263,7 +263,10 @@ def walk_forward_analysis(
             oos_result = engine.run(allocator, oos_bars, oos_funding, min(min_history, split_point))
             oos_metrics.append(oos_result.metrics)
             # Chain equity curves
-            scale = combined_oos_equity[-1] / oos_result.equity_curve[0]
+            if oos_result.equity_curve[0] > 0:
+                scale = combined_oos_equity[-1] / oos_result.equity_curve[0]
+            else:
+                scale = 1.0
             combined_oos_equity.extend(eq * scale for eq in oos_result.equity_curve[1:])
         except ValueError:
             # Not enough data in OOS window

@@ -41,6 +41,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Callable
 
 from quantbot.research.data import FundingRate, OhlcvBar
 from quantbot.research.regime import (
@@ -495,7 +496,7 @@ def create_regime_switching_allocator(
     regime_trend_threshold: float = 0.015,
     drawdown_circuit_breaker: float = 0.05,
     circuit_breaker_lookback: int = 5,
-) -> callable:
+) -> Callable:
     """Factory function to create regime-switching allocator for backtesting.
 
     Args:
