@@ -147,7 +147,12 @@ class VolatilityAdjustedTrendFollower:
             signals[inst_id] = signal
             raw_weights[inst_id] = raw_weight
 
-        # Only take long positions (raw_weight > 0)
+        # Spot-only: negative (short) weights are not allowed since
+        # OKX Spot Demo (tdMode=cash) does not permit shorting.
+        # Instruments with bearish signals receive zero weight (go to cash).
+        # NOTE: This means the strategy cannot profit from downtrends;
+        # it only avoids them.  Real-market performance in prolonged
+        # bear markets will be worse than a long/short variant.
         long_weights = {k: v for k, v in raw_weights.items() if v > 0}
         if not long_weights:
             return {}
