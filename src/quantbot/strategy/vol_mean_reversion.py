@@ -597,11 +597,11 @@ class VolMeanReversionAlpha:
             if atr > 0:
                 self._stop_levels[inst_id] = price - stop_mult * atr
 
-            # Vol-targeting scalar
+            # Vol-targeting scalar — skip instrument when vol is zero
             daily_vol = _realised_vol(bars, cfg.vol_lookback)
-            ann_vol = (
-                daily_vol * math.sqrt(cfg.annualisation_factor) if daily_vol > 0 else cfg.vol_target
-            )
+            if daily_vol <= 0:
+                continue
+            ann_vol = daily_vol * math.sqrt(cfg.annualisation_factor)
             vol_scalar = cfg.vol_target / ann_vol if ann_vol > _EPSILON else 1.0
             vol_scalar *= regime_exposure
 
@@ -621,18 +621,21 @@ class VolMeanReversionAlpha:
             scale = cfg.gross_exposure / total if total > _EPSILON else 0.0
             raw = {k: v * scale for k, v in raw.items()}
 
+        _QUANT = Decimal("0.000001")
+
         # Apply drawdown scale and cap
         weights: dict[str, Decimal] = {}
         for inst_id, w in raw.items():
             capped = min(w * dd_scale, cfg.max_position_weight)
             if capped >= cfg.min_position_weight:
-                weights[inst_id] = Decimal(str(round(capped, 6)))
+                weights[inst_id] = Decimal(capped).quantize(_QUANT)
 
         # Final gross exposure cap
+        gross_limit = Decimal(str(cfg.gross_exposure))
         gross = sum(weights.values())
-        if gross > Decimal(str(cfg.gross_exposure)):
-            scale_d = Decimal(str(cfg.gross_exposure)) / gross
-            weights = {k: Decimal(str(round(float(v * scale_d), 6))) for k, v in weights.items()}
+        if gross > gross_limit:
+            scale_d = gross_limit / gross
+            weights = {k: (v * scale_d).quantize(_QUANT) for k, v in weights.items()}
 
         self._prev_weights = {k: float(v) for k, v in weights.items()}
         return weights
