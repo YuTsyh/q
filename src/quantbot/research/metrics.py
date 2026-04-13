@@ -32,7 +32,7 @@ class PerformanceMetrics:
 def compute_metrics(
     equity_curve: list[float],
     trade_returns: list[float],
-    periods_per_year: float = 252.0,
+    periods_per_year: float = 365.0,
     risk_free_rate: float = 0.0,
 ) -> PerformanceMetrics:
     """Compute comprehensive performance metrics.
@@ -41,6 +41,7 @@ def compute_metrics(
         equity_curve: List of portfolio equity values (starting equity first).
         trade_returns: List of per-trade percentage returns.
         periods_per_year: Number of rebalance periods per year.
+            Defaults to 365 for crypto markets (24/7 trading).
         risk_free_rate: Annual risk-free rate for Sharpe/Sortino.
 
     Returns:

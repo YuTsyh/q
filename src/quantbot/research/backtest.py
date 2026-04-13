@@ -5,7 +5,9 @@ Supports:
 - Out-of-sample testing
 - Monte Carlo simulation
 - Parameter sensitivity analysis
-- Realistic transaction cost and slippage modelling
+- Realistic transaction cost and slippage modelling via Almgren-Chriss
+  non-linear market impact (:class:`EnhancedExecutionSimulator`)
+- Bar-level stop-loss checking (every bar, not just at rebalance)
 """
 
 from __future__ import annotations
@@ -17,8 +19,15 @@ from decimal import Decimal
 from typing import Callable
 
 from quantbot.research.data import FundingRate, OhlcvBar
+from quantbot.research.market_impact import (
+    EnhancedExecutionSimulator,
+    MarketImpactConfig,
+    compute_adv,
+)
 from quantbot.research.metrics import PerformanceMetrics, compute_metrics
-from quantbot.research.simulator import ExecutionAssumptions, ReplayExecutionSimulator
+
+
+_ZERO = Decimal("0")
 
 
 @dataclass(frozen=True)
@@ -31,6 +40,8 @@ class BacktestConfig:
     slippage_bps: float = 2.0
     partial_fill_ratio: float = 1.0
     periods_per_year: float = 365.0  # daily bars default
+    use_market_impact: bool = True
+    market_impact_config: MarketImpactConfig | None = None
 
 
 @dataclass
@@ -52,16 +63,39 @@ StrategyAllocator = Callable[
 
 
 class BacktestEngine:
-    """Run time-series backtests on portfolio allocation strategies."""
+    """Run time-series backtests on portfolio allocation strategies.
+
+    By default the engine uses :class:`EnhancedExecutionSimulator` for
+    volume-dependent, non-linear slippage (Almgren-Chriss).  Set
+    ``config.use_market_impact = False`` to fall back to the legacy
+    fixed-BPS slippage model.
+
+    Stop-losses stored in the allocator's ``_stop_levels`` attribute
+    (if present) are checked on **every bar**, not just at rebalance
+    intervals.
+    """
 
     def __init__(self, config: BacktestConfig) -> None:
         self._config = config
-        self._assumptions = ExecutionAssumptions(
-            taker_fee_rate=Decimal(str(config.taker_fee_rate)),
-            slippage_bps=Decimal(str(config.slippage_bps)),
-            partial_fill_ratio=Decimal(str(config.partial_fill_ratio)),
-        )
-        self._simulator = ReplayExecutionSimulator(self._assumptions)
+        if config.use_market_impact:
+            mi_config = config.market_impact_config or MarketImpactConfig(
+                taker_fee_rate=Decimal(str(config.taker_fee_rate)),
+            )
+            self._enhanced_sim = EnhancedExecutionSimulator(mi_config)
+            self._legacy_sim = None
+        else:
+            from quantbot.research.simulator import (
+                ExecutionAssumptions,
+                ReplayExecutionSimulator,
+            )
+            self._enhanced_sim = None
+            self._legacy_sim = ReplayExecutionSimulator(
+                ExecutionAssumptions(
+                    taker_fee_rate=Decimal(str(config.taker_fee_rate)),
+                    slippage_bps=Decimal(str(config.slippage_bps)),
+                    partial_fill_ratio=Decimal(str(config.partial_fill_ratio)),
+                )
+            )
 
     def run(
         self,
@@ -94,6 +128,10 @@ class BacktestEngine:
         current_weights: dict[str, Decimal] = {}
         bar_count = 0
         last_rebalance_equity = equity  # Track equity at last rebalance
+
+        # Extract the underlying strategy object (if any) to access
+        # stop-levels for bar-level stop checking.
+        _strategy_obj = _extract_strategy_object(allocator)
 
         for t_idx in range(min_history, len(all_timestamps)):
             bar_count += 1
@@ -130,6 +168,22 @@ class BacktestEngine:
                                 pnl += Decimal(str(equity)) * weight * ret
                 equity = max(equity + float(pnl), 0.0)
 
+            # ---- Bar-level stop-loss check (Issue 5) --------------------
+            # Check stop levels every bar, not just at rebalance.  If any
+            # held instrument breaches its stop, zero its weight immediately.
+            if _strategy_obj is not None and current_weights:
+                stop_levels = getattr(_strategy_obj, "_stop_levels", None)
+                if stop_levels is not None:
+                    stopped_ids: list[str] = []
+                    for inst_id, weight in current_weights.items():
+                        if weight > _ZERO and inst_id in stop_levels:
+                            price_f = float(prices.get(inst_id, Decimal("0")))
+                            if price_f > 0 and price_f < stop_levels[inst_id]:
+                                stopped_ids.append(inst_id)
+                    for inst_id in stopped_ids:
+                        del stop_levels[inst_id]
+                        current_weights[inst_id] = _ZERO
+
             # Rebalance at interval
             if bar_count % self._config.rebalance_every_n_bars == 0:
                 # Record rebalance-to-rebalance return (trade-level)
@@ -143,13 +197,13 @@ class BacktestEngine:
                     target_weights = {}
 
                 if target_weights and equity > 0:
-                    fills = self._simulator.rebalance(
-                        equity=Decimal(str(equity)),
+                    total_fees = self._execute_rebalance(
+                        equity=equity,
                         current_weights=current_weights,
                         target_weights=target_weights,
                         prices=prices,
+                        sliced_bars=sliced_bars,
                     )
-                    total_fees = sum(float(f.fee) for f in fills)
                     equity = max(equity - total_fees, 0.0)
                     current_weights = target_weights
 
@@ -179,6 +233,70 @@ class BacktestEngine:
             weights_history=weights_history,
             metrics=metrics,
         )
+
+    # -- internal helpers --------------------------------------------------
+
+    def _execute_rebalance(
+        self,
+        *,
+        equity: float,
+        current_weights: dict[str, Decimal],
+        target_weights: dict[str, Decimal],
+        prices: dict[str, Decimal],
+        sliced_bars: dict[str, list[OhlcvBar]],
+    ) -> float:
+        """Execute a portfolio rebalance and return total fees incurred."""
+        if self._enhanced_sim is not None:
+            # Compute volumes and ADV from bar history
+            volumes: dict[str, Decimal] = {}
+            adv_map: dict[str, Decimal] = {}
+            for inst_id in target_weights:
+                bars_list = sliced_bars.get(inst_id, [])
+                if bars_list:
+                    volumes[inst_id] = bars_list[-1].volume
+                    adv_map[inst_id] = compute_adv(bars_list)
+                else:
+                    volumes[inst_id] = _ZERO
+                    adv_map[inst_id] = _ZERO
+
+            fills = self._enhanced_sim.rebalance(
+                equity=Decimal(str(equity)),
+                current_weights=current_weights,
+                target_weights=target_weights,
+                prices=prices,
+                volumes=volumes,
+                adv=adv_map,
+            )
+            return sum(float(f.total_cost) for f in fills)
+        else:
+            assert self._legacy_sim is not None
+            fills = self._legacy_sim.rebalance(
+                equity=Decimal(str(equity)),
+                current_weights=current_weights,
+                target_weights=target_weights,
+                prices=prices,
+            )
+            return sum(float(f.fee) for f in fills)
+
+
+def _extract_strategy_object(allocator: StrategyAllocator) -> object | None:
+    """Try to extract the strategy object from an allocator closure.
+
+    Allocator factories (e.g. ``create_trend_following_allocator``) wrap
+    a strategy instance inside a closure.  We inspect ``__closure__`` to
+    find an object that owns a ``_stop_levels`` dict so the engine can
+    check stops every bar.
+    """
+    closure = getattr(allocator, "__closure__", None)
+    if closure:
+        for cell in closure:
+            try:
+                obj = cell.cell_contents
+                if hasattr(obj, "_stop_levels"):
+                    return obj
+            except ValueError:
+                continue
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -319,9 +437,20 @@ def monte_carlo_simulation(
     periods_per_year: float = 365.0,
     seed: int | None = 42,
 ) -> MonteCarloResult:
-    """Run Monte Carlo simulation by shuffling trade returns.
+    """Run Monte Carlo simulation via *permutation test*.
 
-    Tests whether strategy profitability is robust to trade ordering.
+    Instead of merely shuffling the trade-return *sequence* (which
+    preserves positive expectancy and almost always produces positive
+    results), this implementation uses a permutation test that randomly
+    flips the sign of each trade return with 50 % probability.  This
+    destroys the signal-return relationship while preserving the
+    magnitude distribution, providing a proper null-hypothesis test
+    for whether the strategy has genuine alpha.
+
+    The returned ``p5_sharpe`` represents the 5th-percentile Sharpe
+    under the null of *no predictive signal*.  If the strategy's
+    actual Sharpe is above this value, the strategy is unlikely to be
+    a fluke.
     """
     if not trade_returns:
         raise ValueError("No trade returns for Monte Carlo")
@@ -332,18 +461,19 @@ def monte_carlo_simulation(
     total_returns: list[float] = []
 
     for _ in range(n_simulations):
-        shuffled = trade_returns.copy()
-        rng.shuffle(shuffled)
+        # Permutation test: randomly flip signs to destroy signal-return
+        # mapping while preserving the distribution of magnitudes.
+        permuted = [r * (1 if rng.random() < 0.5 else -1) for r in trade_returns]
 
         equity_curve = [initial_equity]
         eq = initial_equity
-        for r in shuffled:
+        for r in permuted:
             eq *= (1.0 + r)
             equity_curve.append(max(eq, 0.0))
 
         metrics = compute_metrics(
             equity_curve=equity_curve,
-            trade_returns=shuffled,
+            trade_returns=permuted,
             periods_per_year=periods_per_year,
         )
         sharpes.append(metrics.sharpe_ratio)
