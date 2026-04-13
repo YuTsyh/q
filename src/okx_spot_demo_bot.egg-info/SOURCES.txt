@@ -63,6 +63,7 @@ tests/test_engine.py
 tests/test_ensemble.py
 tests/test_execution_simulator.py
 tests/test_instruments.py
+tests/test_live_feasibility.py
 tests/test_live_risk.py
 tests/test_market_data.py
 tests/test_market_impact.py
