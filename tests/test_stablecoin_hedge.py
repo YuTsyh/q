@@ -7,13 +7,10 @@ import random
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-import pytest
-
 from quantbot.research.data import OhlcvBar
 from quantbot.research.markov_regime import MarkovRegimeState
 from quantbot.research.stablecoin_hedge import (
     AdaptivePortfolioConstructor,
-    StablecoinHedgeConfig,
     StablecoinHedger,
     VolatilityScaler,
     VolatilityScalingConfig,

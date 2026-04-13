@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
 from quantbot.research.robustness import (
     PerturbationResult,
     format_perturbation_report,

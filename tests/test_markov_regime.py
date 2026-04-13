@@ -79,7 +79,6 @@ class TestComputeAmihud:
         bars = _make_bars(30)
         # Replace volumes with zero in the last 21 bars
         zero_bars = list(bars[:-21])
-        t = bars[-21].ts
         for b in bars[-21:]:
             zero_bars.append(
                 OhlcvBar(
