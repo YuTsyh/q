@@ -181,6 +181,8 @@ def generate_ohlcv(
                         for _ in range(n_jumps):
                             ret += rng.gauss(nc.jump_mean, nc.jump_std)
 
+                # Clamp return to avoid overflow in exp()
+                ret = max(min(ret, 1.0), -1.0)
                 new_price = price * math.exp(ret)
             else:
                 # Legacy GBM path (backward compatible)
