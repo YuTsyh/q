@@ -25,7 +25,7 @@ INSTRUMENTS = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"]
 
 
 @pytest.fixture
-def market_data():
+def three_instrument_data():
     return generate_multi_instrument_data(
         INSTRUMENTS, regimes=FULL_CYCLE_REGIMES, seed_base=42
     )
@@ -71,21 +71,21 @@ class TestAtr:
 
 
 class TestVolatilityAdjustedTrendFollower:
-    def test_allocate_returns_dict(self, market_data):
-        bars, funding = market_data
+    def test_allocate_returns_dict(self, three_instrument_data):
+        bars, funding = three_instrument_data
         strategy = VolatilityAdjustedTrendFollower()
         weights = strategy.allocate(bars, funding)
         assert isinstance(weights, dict)
 
-    def test_all_weights_non_negative(self, market_data):
-        bars, funding = market_data
+    def test_all_weights_non_negative(self, three_instrument_data):
+        bars, funding = three_instrument_data
         strategy = VolatilityAdjustedTrendFollower()
         weights = strategy.allocate(bars, funding)
         for w in weights.values():
             assert w >= Decimal("0")
 
-    def test_max_weight_respected(self, market_data):
-        bars, funding = market_data
+    def test_max_weight_respected(self, three_instrument_data):
+        bars, funding = three_instrument_data
         config = TrendFollowConfig(max_position_weight=0.3)
         strategy = VolatilityAdjustedTrendFollower(config)
         weights = strategy.allocate(bars, funding)
@@ -97,8 +97,8 @@ class TestVolatilityAdjustedTrendFollower:
         weights = strategy.allocate({}, {})
         assert weights == {}
 
-    def test_custom_config(self, market_data):
-        bars, funding = market_data
+    def test_custom_config(self, three_instrument_data):
+        bars, funding = three_instrument_data
         config = TrendFollowConfig(
             fast_ema_period=3,
             slow_ema_period=10,
@@ -115,8 +115,8 @@ class TestCreateTrendFollowingAllocator:
         allocator = create_trend_following_allocator()
         assert callable(allocator)
 
-    def test_produces_weights(self, market_data):
-        bars, funding = market_data
+    def test_produces_weights(self, three_instrument_data):
+        bars, funding = three_instrument_data
         allocator = create_trend_following_allocator(fast_ema=3, slow_ema=10)
         weights = allocator(bars, funding)
         assert isinstance(weights, dict)

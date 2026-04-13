@@ -15,35 +15,10 @@ from quantbot.research.backtest import (
     walk_forward_analysis,
 )
 from quantbot.research.synthetic_data import (
-    FULL_CYCLE_REGIMES,
-    MULTI_CYCLE_REGIMES,
     generate_multi_instrument_data,
 )
 from quantbot.strategy.adaptive_momentum import create_adaptive_dual_momentum_allocator
 from quantbot.strategy.trend_following import create_trend_following_allocator
-
-
-INSTRUMENTS = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "DOGE-USDT-SWAP"]
-
-
-@pytest.fixture
-def market_data():
-    bars, funding = generate_multi_instrument_data(
-        INSTRUMENTS,
-        regimes=FULL_CYCLE_REGIMES,
-        seed_base=42,
-    )
-    return bars, funding
-
-
-@pytest.fixture
-def long_market_data():
-    bars, funding = generate_multi_instrument_data(
-        INSTRUMENTS,
-        regimes=MULTI_CYCLE_REGIMES,
-        seed_base=42,
-    )
-    return bars, funding
 
 
 @pytest.fixture
@@ -59,44 +34,44 @@ def config():
 
 
 class TestBacktestEngine:
-    def test_basic_run(self, market_data, config):
-        bars, funding = market_data
+    def test_basic_run(self, full_cycle_data, config):
+        bars, funding = full_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         engine = BacktestEngine(config)
         result = engine.run(allocator, bars, funding, min_history=15)
         assert len(result.equity_curve) > 10
         assert result.metrics is not None
 
-    def test_trend_following_run(self, market_data, config):
-        bars, funding = market_data
+    def test_trend_following_run(self, full_cycle_data, config):
+        bars, funding = full_cycle_data
         allocator = create_trend_following_allocator(fast_ema=3, slow_ema=10)
         engine = BacktestEngine(config)
         result = engine.run(allocator, bars, funding, min_history=15)
         assert len(result.equity_curve) > 10
 
-    def test_equity_curve_starts_at_initial(self, market_data, config):
-        bars, funding = market_data
+    def test_equity_curve_starts_at_initial(self, full_cycle_data, config):
+        bars, funding = full_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         engine = BacktestEngine(config)
         result = engine.run(allocator, bars, funding, min_history=15)
         assert result.equity_curve[0] == config.initial_equity
 
-    def test_timestamps_populated(self, market_data, config):
-        bars, funding = market_data
+    def test_timestamps_populated(self, full_cycle_data, config):
+        bars, funding = full_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         engine = BacktestEngine(config)
         result = engine.run(allocator, bars, funding, min_history=15)
         assert len(result.timestamps) > 0
 
-    def test_weights_history_populated(self, market_data, config):
-        bars, funding = market_data
+    def test_weights_history_populated(self, full_cycle_data, config):
+        bars, funding = full_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         engine = BacktestEngine(config)
         result = engine.run(allocator, bars, funding, min_history=15)
         assert len(result.weights_history) > 0
 
     def test_not_enough_data_raises(self, config):
-        from quantbot.research.synthetic_data import MarketRegime, generate_multi_instrument_data
+        from quantbot.research.synthetic_data import MarketRegime
         tiny_regime = [MarketRegime("tiny", 0.0, 0.01, 3)]
         bars, funding = generate_multi_instrument_data(["X-USDT-SWAP"], tiny_regime)
         allocator = create_adaptive_dual_momentum_allocator(top_n=1)
@@ -106,8 +81,8 @@ class TestBacktestEngine:
 
 
 class TestWalkForwardAnalysis:
-    def test_produces_results(self, long_market_data, config):
-        bars, funding = long_market_data
+    def test_produces_results(self, multi_cycle_data, config):
+        bars, funding = multi_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         result = walk_forward_analysis(
             allocator, bars, funding, config,
@@ -117,8 +92,8 @@ class TestWalkForwardAnalysis:
         assert len(result.oos_metrics) > 0
         assert result.combined_oos_metrics is not None
 
-    def test_oos_equity_curve_continuous(self, long_market_data, config):
-        bars, funding = long_market_data
+    def test_oos_equity_curve_continuous(self, multi_cycle_data, config):
+        bars, funding = multi_cycle_data
         allocator = create_trend_following_allocator(fast_ema=3, slow_ema=10)
         result = walk_forward_analysis(
             allocator, bars, funding, config,
@@ -149,8 +124,8 @@ class TestMonteCarloSimulation:
 
 
 class TestStressTest:
-    def test_produces_five_scenarios(self, market_data, config):
-        bars, funding = market_data
+    def test_produces_five_scenarios(self, full_cycle_data, config):
+        bars, funding = full_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         results = stress_test(allocator, bars, funding, config, min_history=15)
         assert len(results) == 5
@@ -161,8 +136,8 @@ class TestStressTest:
         assert "low_fill_50pct" in scenario_names
         assert "combined_stress" in scenario_names
 
-    def test_normal_better_than_stressed(self, market_data, config):
-        bars, funding = market_data
+    def test_normal_better_than_stressed(self, full_cycle_data, config):
+        bars, funding = full_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         results = stress_test(allocator, bars, funding, config, min_history=15)
         normal = next(r for r in results if r.scenario_name == "normal")

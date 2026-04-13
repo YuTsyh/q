@@ -5,10 +5,6 @@ from __future__ import annotations
 import pytest
 
 from quantbot.research.backtest import BacktestConfig
-from quantbot.research.synthetic_data import (
-    MULTI_CYCLE_REGIMES,
-    generate_multi_instrument_data,
-)
 from quantbot.research.validation import (
     AcceptanceCriteria,
     ValidationResult,
@@ -16,18 +12,6 @@ from quantbot.research.validation import (
 )
 from quantbot.strategy.adaptive_momentum import create_adaptive_dual_momentum_allocator
 from quantbot.strategy.trend_following import create_trend_following_allocator
-
-
-INSTRUMENTS = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "DOGE-USDT-SWAP"]
-
-
-@pytest.fixture
-def long_data():
-    return generate_multi_instrument_data(
-        INSTRUMENTS,
-        regimes=MULTI_CYCLE_REGIMES,
-        seed_base=42,
-    )
 
 
 @pytest.fixture
@@ -43,8 +27,8 @@ def config():
 
 
 class TestValidateStrategy:
-    def test_returns_validation_result(self, long_data, config):
-        bars, funding = long_data
+    def test_returns_validation_result(self, multi_cycle_data, config):
+        bars, funding = multi_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         result = validate_strategy(
             "Adaptive Dual Momentum",
@@ -57,8 +41,8 @@ class TestValidateStrategy:
         assert result.monte_carlo is not None
         assert len(result.stress_tests) == 5
 
-    def test_acceptance_dict_populated(self, long_data, config):
-        bars, funding = long_data
+    def test_acceptance_dict_populated(self, multi_cycle_data, config):
+        bars, funding = multi_cycle_data
         allocator = create_trend_following_allocator(fast_ema=3, slow_ema=10)
         result = validate_strategy(
             "Trend Following",
@@ -71,8 +55,8 @@ class TestValidateStrategy:
         assert "expectancy" in result.acceptance
         assert "mc_p5_sharpe" in result.acceptance
 
-    def test_summary_generated(self, long_data, config):
-        bars, funding = long_data
+    def test_summary_generated(self, multi_cycle_data, config):
+        bars, funding = multi_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         result = validate_strategy(
             "Test Strategy",
@@ -82,9 +66,9 @@ class TestValidateStrategy:
         assert "Validation Report" in result.summary
         assert "Acceptance Criteria" in result.summary
 
-    def test_relaxed_criteria_pass(self, long_data, config):
+    def test_relaxed_criteria_pass(self, multi_cycle_data, config):
         """With very relaxed criteria, validation should pass."""
-        bars, funding = long_data
+        bars, funding = multi_cycle_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         relaxed = AcceptanceCriteria(
             min_sharpe=-100.0,

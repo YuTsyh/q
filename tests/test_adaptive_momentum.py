@@ -21,7 +21,7 @@ INSTRUMENTS = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"]
 
 
 @pytest.fixture
-def market_data():
+def three_instrument_data():
     return generate_multi_instrument_data(
         INSTRUMENTS, regimes=FULL_CYCLE_REGIMES, seed_base=42
     )
@@ -71,14 +71,14 @@ class TestAdaptiveDualMomentumStrategy:
         assert strategy is not None
         assert len(strategy.factors) == 4
 
-    def test_allocate_returns_weights(self, market_data):
-        bars, funding = market_data
+    def test_allocate_returns_weights(self, three_instrument_data):
+        bars, funding = three_instrument_data
         strategy = AdaptiveDualMomentumStrategy.default(top_n=2)
         weights = strategy.allocate(bars, funding)
         assert isinstance(weights, dict)
 
-    def test_allocate_respects_top_n(self, market_data):
-        bars, funding = market_data
+    def test_allocate_respects_top_n(self, three_instrument_data):
+        bars, funding = three_instrument_data
         strategy = AdaptiveDualMomentumStrategy.default(top_n=1)
         weights = strategy.allocate(bars, funding)
         assert len(weights) <= 1
@@ -94,8 +94,8 @@ class TestCreateAllocator:
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         assert callable(allocator)
 
-    def test_allocator_produces_weights(self, market_data):
-        bars, funding = market_data
+    def test_allocator_produces_weights(self, three_instrument_data):
+        bars, funding = three_instrument_data
         allocator = create_adaptive_dual_momentum_allocator(top_n=2)
         weights = allocator(bars, funding)
         assert isinstance(weights, dict)
