@@ -45,6 +45,14 @@ class AllocatorStrategyAdapter:
         allocator signals a new position.
     client_order_prefix :
         Prefix for generated ``client_order_id`` values.
+
+    .. note::
+       Bars built from snapshots will have ``volume=0`` because tick-level
+       volume is not available via :class:`MarketSnapshot`.  If the
+       downstream backtest engine uses volume-dependent market impact
+       (``use_market_impact=True``), the impact model will treat volumes
+       as zero and produce zero slippage.  This is acceptable for live
+       trading where actual exchange order books handle execution.
     """
 
     def __init__(

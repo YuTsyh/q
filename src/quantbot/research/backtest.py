@@ -197,14 +197,14 @@ class BacktestEngine:
                     target_weights = {}
 
                 if target_weights and equity > 0:
-                    total_fees = self._execute_rebalance(
+                    total_costs = self._execute_rebalance(
                         equity=equity,
                         current_weights=current_weights,
                         target_weights=target_weights,
                         prices=prices,
                         sliced_bars=sliced_bars,
                     )
-                    equity = max(equity - total_fees, 0.0)
+                    equity = max(equity - total_costs, 0.0)
                     current_weights = target_weights
 
                 last_rebalance_equity = equity
@@ -245,7 +245,11 @@ class BacktestEngine:
         prices: dict[str, Decimal],
         sliced_bars: dict[str, list[OhlcvBar]],
     ) -> float:
-        """Execute a portfolio rebalance and return total fees incurred."""
+        """Execute a portfolio rebalance and return total transaction costs.
+
+        When ``use_market_impact`` is enabled, includes both slippage and
+        fees.  In legacy mode, returns fees only.
+        """
         if self._enhanced_sim is not None:
             # Compute volumes and ADV from bar history
             volumes: dict[str, Decimal] = {}
@@ -437,15 +441,20 @@ def monte_carlo_simulation(
     periods_per_year: float = 365.0,
     seed: int | None = 42,
 ) -> MonteCarloResult:
-    """Run Monte Carlo simulation via *permutation test*.
+    """Run Monte Carlo simulation via *sign-randomization test*.
 
     Instead of merely shuffling the trade-return *sequence* (which
     preserves positive expectancy and almost always produces positive
-    results), this implementation uses a permutation test that randomly
-    flips the sign of each trade return with 50 % probability.  This
-    destroys the signal-return relationship while preserving the
+    results), this implementation uses a randomization test that
+    randomly flips the sign of each trade return with 50 % probability.
+    This destroys the signal-return relationship while preserving the
     magnitude distribution, providing a proper null-hypothesis test
     for whether the strategy has genuine alpha.
+
+    Note: this is a randomization test (independent random sign flips),
+    not an exhaustive permutation test over all 2^N sign combinations.
+    With ``n_simulations`` >= 500 the sampling is sufficient for
+    reliable p-value estimation.
 
     The returned ``p5_sharpe`` represents the 5th-percentile Sharpe
     under the null of *no predictive signal*.  If the strategy's

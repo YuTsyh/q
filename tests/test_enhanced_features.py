@@ -159,7 +159,7 @@ class TestMultiInstrumentCorrelation:
     def test_correlated_data_has_similar_trends(self):
         """With high correlation, instruments should move together."""
         ids = ["A-USDT", "B-USDT"]
-        regime = MarketRegime("bull", drift=0.002, volatility=0.02, duration_bars=200)
+        regime = MarketRegime("bull", drift=0.002, volatility=0.02, duration_bars=500)
         bars_corr, _ = generate_multi_instrument_data(
             ids, [regime], seed_base=42,
             noise_config=DEFAULT_NOISE_CONFIG, correlation=0.9,

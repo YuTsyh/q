@@ -150,7 +150,10 @@ def generate_ohlcv(
                 # Fat tails via Student-t scaling
                 z = _student_t_sample(rng, nc.df) if nc.df < 30 else z_base
                 # Preserve correlation direction from Cholesky but apply
-                # fat-tail magnitude: use sign of correlated shock, abs of t
+                # fat-tail magnitude: use sign of correlated shock, abs of t.
+                # This ensures cross-asset correlation structure (from
+                # Cholesky decomposition) survives the Student-t transform
+                # while still producing heavier tails.
                 if _correlated_shocks is not None and bar_idx < len(_correlated_shocks):
                     z = math.copysign(abs(z), z_base) if z_base != 0 else z
 
