@@ -103,29 +103,40 @@ def classify_regime(
     # Vol ratio
     vol_ratio = short_vol / long_vol if long_vol > 1e-12 else 1.0
 
-    # Trend score: normalized distance of short SMA from long SMA
-    short_sma = sum(closes[-config.trend_sma_window:]) / config.trend_sma_window
-    long_sma = sum(closes[-config.trend_long_sma_window:]) / config.trend_long_sma_window
+    # Trend score: use EMA for smoother signal (less noise sensitivity)
+    short_ema = _ema_value(closes, config.trend_sma_window)
+    long_ema = _ema_value(closes, config.trend_long_sma_window)
 
-    if long_sma > 0:
-        trend_score = (short_sma - long_sma) / long_sma
+    if long_ema > 0:
+        trend_score = (short_ema - long_ema) / long_ema
     else:
         trend_score = 0.0
 
-    # Classify
+    # Additional momentum confirmation: absolute return over trend window
+    momentum_window = min(config.trend_sma_window, len(closes) - 1)
+    if momentum_window > 0 and closes[-momentum_window - 1] > 0:
+        abs_momentum = closes[-1] / closes[-momentum_window - 1] - 1.0
+    else:
+        abs_momentum = 0.0
+
+    # Classify with momentum confirmation
     if vol_ratio > config.vol_crisis_threshold:
         regime = MarketRegimeType.HIGH_VOL_CRISIS
         confidence = min(1.0, (vol_ratio - config.vol_crisis_threshold) / 1.0 + 0.6)
     elif abs(trend_score) < config.trend_threshold:
         regime = MarketRegimeType.RANGE_BOUND
-        # Confidence increases as trend_score approaches zero
         confidence = 1.0 - abs(trend_score) / config.trend_threshold
-    elif trend_score > 0:
+    elif trend_score > 0 and abs_momentum > -config.trend_threshold:
+        # Bull requires positive EMA trend AND non-negative momentum
         regime = MarketRegimeType.BULL_TRENDING
         confidence = min(1.0, trend_score / 0.1)
-    else:
+    elif trend_score < 0 or abs_momentum < -config.trend_threshold:
+        # Bear if EMA trend is negative OR strong negative momentum
         regime = MarketRegimeType.BEAR_TRENDING
-        confidence = min(1.0, abs(trend_score) / 0.1)
+        confidence = min(1.0, max(abs(trend_score), abs(min(0, abs_momentum))) / 0.1)
+    else:
+        regime = MarketRegimeType.RANGE_BOUND
+        confidence = 0.5
 
     return RegimeClassification(
         regime=regime,
@@ -187,3 +198,18 @@ def _std(values: list[float]) -> float:
     mean = sum(values) / len(values)
     var = sum((v - mean) ** 2 for v in values) / (len(values) - 1)
     return math.sqrt(var)
+
+
+def _ema_value(values: list[float], period: int) -> float:
+    """Compute exponential moving average and return the final value.
+
+    EMA is less sensitive to noise than SMA, making it more suitable
+    for regime detection where lag/noise trade-off is critical.
+    """
+    if not values or period < 1:
+        return 0.0
+    alpha = 2.0 / (period + 1)
+    ema = values[0]
+    for i in range(1, len(values)):
+        ema = alpha * values[i] + (1 - alpha) * ema
+    return ema

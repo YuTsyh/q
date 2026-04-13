@@ -191,11 +191,11 @@ class RegimeSwitchingAlpha:
             vol_high_threshold=self._config.regime_vol_high,
             trend_threshold=self._config.regime_trend_threshold,
         )
-        # Portfolio-level drawdown tracking
+        # Portfolio-level drawdown tracking (rolling window)
         self._prev_weights: dict[str, float] = {}
         self._prev_prices: dict[str, float] = {}
-        self._estimated_equity: float = 1.0  # Normalised
-        self._peak_equity: float = 1.0
+        self._equity_history: list[float] = [1.0]  # Rolling equity track
+        self._dd_window: int = 60  # Rolling DD window (bars)
 
     def allocate(
         self,
@@ -227,14 +227,25 @@ class RegimeSwitchingAlpha:
                     curr_p = current_prices[inst_id]
                     if prev_p > 0:
                         port_return += w * (curr_p / prev_p - 1.0)
-            self._estimated_equity *= (1.0 + port_return)
-            self._peak_equity = max(self._peak_equity, self._estimated_equity)
+            new_eq = self._equity_history[-1] * (1.0 + port_return)
+            self._equity_history.append(new_eq)
+            # Keep only rolling window
+            if len(self._equity_history) > self._dd_window:
+                self._equity_history = self._equity_history[-self._dd_window:]
+        else:
+            # First call or after reset - start fresh equity tracking
+            if len(self._equity_history) > 1:
+                self._equity_history.append(self._equity_history[-1])
+            if len(self._equity_history) > self._dd_window:
+                self._equity_history = self._equity_history[-self._dd_window:]
 
         self._prev_prices = current_prices
 
-        # Portfolio-level drawdown control
-        if self._peak_equity > 0:
-            dd = 1.0 - self._estimated_equity / self._peak_equity
+        # Portfolio-level drawdown control (rolling window peak)
+        if len(self._equity_history) >= 2:
+            peak = max(self._equity_history)
+            current = self._equity_history[-1]
+            dd = 1.0 - current / peak if peak > 0 else 0.0
         else:
             dd = 0.0
 
