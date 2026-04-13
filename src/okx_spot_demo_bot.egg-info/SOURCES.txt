@@ -51,13 +51,17 @@ src/quantbot/strategy/__init__.py
 src/quantbot/strategy/adaptive_momentum.py
 src/quantbot/strategy/base.py
 src/quantbot/strategy/breakout.py
+src/quantbot/strategy/cross_sectional_arb.py
 src/quantbot/strategy/ensemble.py
 src/quantbot/strategy/mean_reversion_markov.py
+src/quantbot/strategy/microstructure_flow.py
 src/quantbot/strategy/regime_switching.py
 src/quantbot/strategy/trend_following.py
+src/quantbot/strategy/vol_mean_reversion.py
 tests/test_adaptive_momentum.py
 tests/test_backtest_engine.py
 tests/test_config.py
+tests/test_cross_sectional_arb.py
 tests/test_crypto_factors.py
 tests/test_engine.py
 tests/test_ensemble.py
@@ -70,6 +74,7 @@ tests/test_market_impact.py
 tests/test_markov_regime.py
 tests/test_mean_reversion_markov.py
 tests/test_metrics.py
+tests/test_microstructure_flow.py
 tests/test_multifactor_strategy.py
 tests/test_okx_auth.py
 tests/test_okx_rest_client.py
@@ -93,3 +98,4 @@ tests/test_synthetic_data.py
 tests/test_trend_following.py
 tests/test_validation.py
 tests/test_vol_factors.py
+tests/test_vol_mean_reversion.py
