@@ -15,7 +15,8 @@ simpler regime-switching alpha), this strategy:
 2. **Crypto-Native Factor Composite**: Constructs a composite z-score from
    five orthogonal mean-reversion signals:
    - RSI (centered): identifies oversold instruments
-   - Bollinger Band width: detects volatility compression → breakout entry
+   - Bollinger Band width: detects volatility compression (tight bands
+     indicate reduced dispersion, a precondition for mean-reversion entry)
    - VWAP deviation: measures displacement from fair value
    - Order-flow imbalance: proxy for order-book pressure
    - OBV trend: accumulation/distribution confirmation
