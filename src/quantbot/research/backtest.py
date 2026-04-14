@@ -204,8 +204,16 @@ class BacktestEngine:
                         prices=prices,
                         sliced_bars=sliced_bars,
                     )
-                    equity = max(equity - total_costs, 0.0)
-                    current_weights = target_weights
+                    # Cap transaction costs at equity — in live trading the
+                    # exchange would reject an order that cannot be funded;
+                    # here we skip the rebalance when costs would be ruinous
+                    # (> 50 % of equity).
+                    if total_costs > equity * 0.5:
+                        # Reject the rebalance: costs too high (illiquid)
+                        pass
+                    else:
+                        equity = max(equity - total_costs, 0.0)
+                        current_weights = target_weights
 
                 last_rebalance_equity = equity
 
@@ -289,18 +297,34 @@ def _extract_strategy_object(allocator: StrategyAllocator) -> object | None:
     Allocator factories (e.g. ``create_trend_following_allocator``) wrap
     a strategy instance inside a closure.  We inspect ``__closure__`` to
     find an object that owns a ``_stop_levels`` dict so the engine can
-    check stops every bar.
+    check stops every bar.  Handles nested closures (e.g. from risk
+    overlay wrapping).
     """
-    closure = getattr(allocator, "__closure__", None)
-    if closure:
+    visited: set[int] = set()
+
+    def _search(func: object) -> object | None:
+        closure = getattr(func, "__closure__", None)
+        if not closure:
+            return None
         for cell in closure:
             try:
                 obj = cell.cell_contents
-                if hasattr(obj, "_stop_levels"):
-                    return obj
             except ValueError:
                 continue
-    return None
+            obj_id = id(obj)
+            if obj_id in visited:
+                continue
+            visited.add(obj_id)
+            if hasattr(obj, "_stop_levels"):
+                return obj
+            # Recurse into nested callables (e.g. risk overlay wrapping)
+            if callable(obj):
+                result = _search(obj)
+                if result is not None:
+                    return result
+        return None
+
+    return _search(allocator)
 
 
 # ---------------------------------------------------------------------------

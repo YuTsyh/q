@@ -26,24 +26,28 @@ from decimal import Decimal
 from typing import Callable
 
 from quantbot.research.data import FundingRate, OhlcvBar
+from quantbot.research.regime import MarketRegimeType, classify_regime
 
 
 @dataclass(frozen=True)
 class EnsembleConfig:
     """Configuration for ensemble strategy."""
 
-    fast_ema: int = 5
-    slow_ema: int = 15
-    momentum_lookback: int = 10
+    fast_ema: int = 3
+    slow_ema: int = 10
+    momentum_lookback: int = 7
     vol_lookback: int = 15
     atr_period: int = 10
-    trend_ma_lookbacks: tuple[int, ...] = (5, 10, 20)
+    trend_ma_lookbacks: tuple[int, ...] = (3, 7, 14)
     min_trend_strength: float = 0.5  # At least half of MAs must confirm
-    vol_target: float = 0.15
-    max_position_weight: float = 0.30
-    gross_exposure: float = 1.0
-    stop_loss_atr_multiple: float = 2.0
+    vol_target: float = 0.18
+    max_position_weight: float = 0.20
+    gross_exposure: float = 0.7
+    stop_loss_atr_multiple: float = 1.5
     top_n: int = 3  # Max instruments
+    use_regime_filter: bool = True
+    crash_lookback: int = 3
+    crash_threshold: float = -0.04
 
 
 def _ema(values: list[float], period: int) -> list[float]:
@@ -87,6 +91,14 @@ class EnsembleMomentumTrend:
     ) -> dict[str, Decimal]:
         """Compute target weights using ensemble signal filtering."""
         cfg = self._config
+
+        # --- Regime filter: reduce/eliminate exposure in bear/crisis ---
+        regime_scale = 1.0
+        if cfg.use_regime_filter:
+            regime_scale = self._compute_regime_scale(bars_by_instrument)
+        if regime_scale <= 0:
+            return {}
+
         candidates: dict[str, float] = {}  # inst_id -> composite_score
         volatilities: dict[str, float] = {}
 
@@ -102,7 +114,13 @@ class EnsembleMomentumTrend:
             if len(bars) < min_required:
                 continue
 
+            # Per-instrument crash guard
             closes = [float(b.close) for b in bars]
+            if len(closes) > cfg.crash_lookback + 1:
+                recent_ret = closes[-1] / closes[-cfg.crash_lookback - 1] - 1.0
+                if recent_ret < cfg.crash_threshold:
+                    continue
+
             current_price = closes[-1]
 
             # --- Signal 1: EMA Crossover ---
@@ -190,22 +208,46 @@ class EnsembleMomentumTrend:
             return {}
 
         weights: dict[str, Decimal] = {}
+        target_exposure = cfg.gross_exposure * regime_scale
         for inst_id, _ in selected:
-            raw_w = inv_vols[inst_id] / total_inv * cfg.gross_exposure
+            raw_w = inv_vols[inst_id] / total_inv * target_exposure
             capped = min(raw_w, cfg.max_position_weight)
             weights[inst_id] = Decimal(str(round(capped, 6)))
 
         return weights
 
+    def _compute_regime_scale(
+        self,
+        bars_by_instrument: dict[str, list[OhlcvBar]],
+    ) -> float:
+        """Classify regime and return exposure multiplier."""
+        best_bars: list[OhlcvBar] = []
+        for bars in bars_by_instrument.values():
+            if len(bars) > len(best_bars):
+                best_bars = bars
+        if len(best_bars) < 51:
+            return 1.0
+        try:
+            regime = classify_regime(best_bars)
+            regime_map = {
+                MarketRegimeType.BULL_TRENDING: 1.0,
+                MarketRegimeType.RANGE_BOUND: 0.5,
+                MarketRegimeType.BEAR_TRENDING: 0.0,
+                MarketRegimeType.HIGH_VOL_CRISIS: 0.0,
+            }
+            return regime_map.get(regime.regime, 0.5)
+        except (ValueError, ZeroDivisionError):
+            return 0.5
+
 
 def create_ensemble_allocator(
-    fast_ema: int = 5,
-    slow_ema: int = 15,
-    momentum_lookback: int = 10,
-    vol_target: float = 0.15,
-    stop_loss_atr: float = 2.0,
+    fast_ema: int = 3,
+    slow_ema: int = 10,
+    momentum_lookback: int = 7,
+    vol_target: float = 0.18,
+    stop_loss_atr: float = 1.5,
     top_n: int = 3,
-    gross_exposure: float = 1.0,
+    gross_exposure: float = 0.7,
     min_trend_strength: float = 0.5,
 ) -> Callable:
     """Factory function to create ensemble allocator for backtesting."""

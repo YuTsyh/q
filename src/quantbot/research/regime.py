@@ -20,10 +20,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from decimal import Decimal
 from enum import Enum
 
-from quantbot.research.data import FundingRate, OhlcvBar
+from quantbot.research.data import OhlcvBar
 
 
 class MarketRegimeType(Enum):

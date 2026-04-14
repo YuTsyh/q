@@ -27,22 +27,26 @@ from decimal import Decimal
 from typing import Callable
 
 from quantbot.research.data import FundingRate, OhlcvBar
+from quantbot.research.regime import MarketRegimeType, classify_regime
 
 
 @dataclass(frozen=True)
 class TrendFollowConfig:
     """Configuration for trend following strategy."""
 
-    fast_ema_period: int = 5
-    slow_ema_period: int = 20
+    fast_ema_period: int = 3
+    slow_ema_period: int = 12
     atr_period: int = 10
-    vol_lookback: int = 20
-    vol_target: float = 0.15  # 15% annualised target vol per position
-    max_position_weight: float = 0.25
-    stop_loss_atr_multiple: float = 2.0
-    min_trend_strength: float = 0.0  # Absolute momentum threshold
-    gross_exposure: float = 1.0
+    vol_lookback: int = 15
+    vol_target: float = 0.20  # 20% annualised target vol per position
+    max_position_weight: float = 0.20
+    stop_loss_atr_multiple: float = 1.5
+    min_trend_strength: float = 0.005
+    gross_exposure: float = 0.8
     annualisation_factor: float = 365.0  # For crypto daily bars
+    use_regime_filter: bool = True
+    drawdown_threshold: float = 0.04
+    crash_lookback: int = 3
 
 
 def _ema(values: list[float], period: int) -> list[float]:
@@ -85,6 +89,13 @@ class VolatilityAdjustedTrendFollower:
         funding_by_instrument: dict[str, list[FundingRate]],
     ) -> dict[str, Decimal]:
         """Compute target weights based on trend signals and volatility."""
+        # --- Regime filter: reduce/eliminate exposure in bear/crisis ---
+        regime_scale = 1.0
+        if self._config.use_regime_filter:
+            regime_scale = self._compute_regime_scale(bars_by_instrument)
+        if regime_scale <= 0:
+            return {}
+
         signals: dict[str, float] = {}
         raw_weights: dict[str, float] = {}
 
@@ -95,6 +106,10 @@ class VolatilityAdjustedTrendFollower:
                 self._config.atr_period + 2,
             )
             if len(bars) < min_required:
+                continue
+
+            # Per-instrument crash guard
+            if self._is_recently_crashed(bars):
                 continue
 
             closes = [float(b.close) for b in bars]
@@ -157,27 +172,60 @@ class VolatilityAdjustedTrendFollower:
         if not long_weights:
             return {}
 
-        # Normalise to gross exposure
+        # Normalise to gross exposure (scaled by regime)
         total = sum(long_weights.values())
         if total <= 0:
             return {}
 
+        target_exposure = self._config.gross_exposure * regime_scale
         target_weights: dict[str, Decimal] = {}
         for inst_id, w in long_weights.items():
-            normalised = w / total * self._config.gross_exposure
+            normalised = w / total * target_exposure
             capped = min(normalised, self._config.max_position_weight)
             target_weights[inst_id] = Decimal(str(round(capped, 6)))
 
         return target_weights
 
+    def _compute_regime_scale(
+        self,
+        bars_by_instrument: dict[str, list[OhlcvBar]],
+    ) -> float:
+        """Classify regime and return exposure multiplier."""
+        best_bars: list[OhlcvBar] = []
+        for bars in bars_by_instrument.values():
+            if len(bars) > len(best_bars):
+                best_bars = bars
+        if len(best_bars) < 51:
+            return 1.0
+        try:
+            regime = classify_regime(best_bars)
+            regime_map = {
+                MarketRegimeType.BULL_TRENDING: 1.0,
+                MarketRegimeType.RANGE_BOUND: 0.5,
+                MarketRegimeType.BEAR_TRENDING: 0.0,
+                MarketRegimeType.HIGH_VOL_CRISIS: 0.0,
+            }
+            return regime_map.get(regime.regime, 0.5)
+        except (ValueError, ZeroDivisionError):
+            return 0.5
+
+    def _is_recently_crashed(self, bars: list[OhlcvBar]) -> bool:
+        """Check if an instrument had a recent large drawdown."""
+        lookback = self._config.crash_lookback
+        if len(bars) < lookback + 1:
+            return False
+        closes = [float(b.close) for b in bars]
+        ret = closes[-1] / closes[-lookback - 1] - 1.0
+        return ret < -self._config.drawdown_threshold
+
 
 def create_trend_following_allocator(
-    fast_ema: int = 5,
-    slow_ema: int = 20,
-    vol_target: float = 0.15,
+    fast_ema: int = 3,
+    slow_ema: int = 12,
+    vol_target: float = 0.20,
     atr_period: int = 10,
-    stop_loss_atr: float = 2.0,
-    gross_exposure: float = 1.0,
+    stop_loss_atr: float = 1.5,
+    gross_exposure: float = 0.8,
 ) -> Callable:
     """Factory function to create trend-following allocator for backtesting."""
     config = TrendFollowConfig(
