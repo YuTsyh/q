@@ -1,5 +1,23 @@
 # 量化團隊實盤審核報告
 
+## ✅ 修復進度 (Remediation Progress)
+
+> 以下是針對本報告所列各項問題的修復狀態：
+
+| # | 問題 | 狀態 | 修復內容 |
+|---|------|------|----------|
+| 1 | 合成數據作為驗證標準 | ✅ 已修復 | `synthetic_data.py` 加入明確警告，僅供 Unit Test；新增 `real_data.py` OKX 歷史數據下載器 |
+| 2 | Volume=0 K 線拼接 | ✅ 已修復 | `MarketSnapshot` 新增 `last_volume` 欄位；`AllocatorStrategyAdapter` 累計真實 volume |
+| 3 | Market Impact 零滑點 | ✅ 已修復 | `market_impact.py` 在 volume=0 時使用 ADV × 5% 作為 fallback |
+| 4 | 策略過度擬合參數 | ✅ 已修復 | 拉長 EMA/lookback、加寬 ATR stop、加入 cooldown 機制、漸進減倉 |
+| 5 | 不可行策略未標記 | ✅ 已修復 | microstructure_flow / cross_sectional_arb / vol_mean_reversion / regime_switching 標記 Deprecated |
+| 6 | Kill Switch 與策略衝突 | ✅ 已修復 | 15% → 25%；新增階梯減倉（10% DD → 50%、15% DD → 25%、20% DD → flat）|
+| 7 | strategy-report.md 虛假績效 | ✅ 已修復 | 移除 Sharpe 1.53 等虛假聲明，標註所有數據來源為合成數據 |
+| 8 | Ensemble 過度過濾 | ✅ 已修復 | 改為 2-of-3 共識機制，降低 min_trend_strength 至 0.35 |
+
+> **下一步**：使用 `real_data.py` 下載 OKX 真實歷史數據，重新運行 OOS 回測驗證策略真實績效。
+
+---
 這是一份對本量化專案進行深度審核的報告。我們從**「準備要投入真金白銀實盤交易」**的最嚴格標準出發，進行了全面審視。雖然在軟體工程層面（分層架構、測試覆蓋）做得不錯，但**在「量化金融邏輯與策略可行性」上充滿了毀滅性的紅旗（Red Flags）**。如果直接拿這套系統上實盤，絕對會面臨嚴重的虧損與回撤。
 
 ## 🚨 核心嚴重問題審視 (Critical Flaws for Live Trading)

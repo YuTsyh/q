@@ -34,19 +34,24 @@ from quantbot.research.regime import MarketRegimeType, classify_regime
 class TrendFollowConfig:
     """Configuration for trend following strategy."""
 
-    fast_ema_period: int = 3
-    slow_ema_period: int = 12
-    atr_period: int = 10
-    vol_lookback: int = 15
-    vol_target: float = 0.20  # 20% annualised target vol per position
+    fast_ema_period: int = 8
+    slow_ema_period: int = 21
+    atr_period: int = 14
+    vol_lookback: int = 20
+    vol_target: float = 0.15  # 15% annualised target vol per position
     max_position_weight: float = 0.20
-    stop_loss_atr_multiple: float = 1.5
+    stop_loss_atr_multiple: float = 2.5
     min_trend_strength: float = 0.005
     gross_exposure: float = 0.8
     annualisation_factor: float = 365.0  # For crypto daily bars
     use_regime_filter: bool = True
     drawdown_threshold: float = 0.04
     crash_lookback: int = 3
+    # Cooldown: bars to skip after a stop-out before re-entering
+    stop_cooldown_bars: int = 5
+    # Progressive drawdown scaling
+    dd_scale_start: float = 0.10  # start reducing at 10% DD
+    dd_scale_flat: float = 0.25   # go flat at 25% DD
 
 
 def _ema(values: list[float], period: int) -> list[float]:
@@ -82,6 +87,11 @@ class VolatilityAdjustedTrendFollower:
     def __init__(self, config: TrendFollowConfig | None = None) -> None:
         self._config = config or TrendFollowConfig()
         self._stop_levels: dict[str, float] = {}
+        self._cooldown: dict[str, int] = {}  # inst_id -> bars remaining
+        # Rolling equity for progressive DD scaling
+        self._equity_hist: list[float] = [1.0]
+        self._prev_weights: dict[str, float] = {}
+        self._prev_prices: dict[str, float] = {}
 
     def allocate(
         self,
@@ -112,6 +122,14 @@ class VolatilityAdjustedTrendFollower:
             if self._is_recently_crashed(bars):
                 continue
 
+            # Cooldown check: skip if recently stopped out
+            if inst_id in self._cooldown:
+                self._cooldown[inst_id] -= 1
+                if self._cooldown[inst_id] > 0:
+                    continue
+                else:
+                    del self._cooldown[inst_id]
+
             closes = [float(b.close) for b in bars]
             current_price = closes[-1]
 
@@ -132,6 +150,7 @@ class VolatilityAdjustedTrendFollower:
                 if signal > 0 and current_price < self._stop_levels[inst_id]:
                     signal = 0.0  # Stopped out
                     del self._stop_levels[inst_id]
+                    self._cooldown[inst_id] = self._config.stop_cooldown_bars
             if signal > 0 and atr > 0:
                 self._stop_levels[inst_id] = (
                     current_price - self._config.stop_loss_atr_multiple * atr
@@ -177,14 +196,60 @@ class VolatilityAdjustedTrendFollower:
         if total <= 0:
             return {}
 
-        target_exposure = self._config.gross_exposure * regime_scale
+        # Progressive drawdown scaling
+        dd_scale = self._compute_dd_scale(bars_by_instrument)
+
+        target_exposure = self._config.gross_exposure * regime_scale * dd_scale
+        if target_exposure <= 0:
+            return {}
         target_weights: dict[str, Decimal] = {}
         for inst_id, w in long_weights.items():
             normalised = w / total * target_exposure
             capped = min(normalised, self._config.max_position_weight)
             target_weights[inst_id] = Decimal(str(round(capped, 6)))
 
+        self._prev_weights = {k: float(v) for k, v in target_weights.items()}
         return target_weights
+
+    def _compute_dd_scale(
+        self,
+        bars_by_instrument: dict[str, list[OhlcvBar]],
+    ) -> float:
+        """Progressive drawdown scaling: reduce exposure as DD grows."""
+        # Update equity estimate
+        current_prices = {}
+        for inst_id, bars in bars_by_instrument.items():
+            if bars:
+                current_prices[inst_id] = float(bars[-1].close)
+
+        if self._prev_weights and self._prev_prices:
+            port_ret = 0.0
+            for inst_id, w in self._prev_weights.items():
+                if inst_id in current_prices and inst_id in self._prev_prices:
+                    prev_p = self._prev_prices[inst_id]
+                    curr_p = current_prices[inst_id]
+                    if prev_p > 0:
+                        port_ret += w * (curr_p / prev_p - 1.0)
+            self._equity_hist.append(self._equity_hist[-1] * (1.0 + port_ret))
+        elif len(self._equity_hist) > 1:
+            self._equity_hist.append(self._equity_hist[-1])
+
+        if len(self._equity_hist) > 60:
+            self._equity_hist = self._equity_hist[-60:]
+        self._prev_prices = current_prices
+
+        if len(self._equity_hist) < 2:
+            return 1.0
+        peak = max(self._equity_hist)
+        current = self._equity_hist[-1]
+        dd = 1.0 - current / peak if peak > 0 else 0.0
+
+        cfg = self._config
+        if dd <= cfg.dd_scale_start:
+            return 1.0
+        if dd >= cfg.dd_scale_flat:
+            return 0.0
+        return max(0.0, 1.0 - (dd - cfg.dd_scale_start) / (cfg.dd_scale_flat - cfg.dd_scale_start))
 
     def _compute_regime_scale(
         self,
@@ -220,11 +285,11 @@ class VolatilityAdjustedTrendFollower:
 
 
 def create_trend_following_allocator(
-    fast_ema: int = 3,
-    slow_ema: int = 12,
-    vol_target: float = 0.20,
-    atr_period: int = 10,
-    stop_loss_atr: float = 1.5,
+    fast_ema: int = 8,
+    slow_ema: int = 21,
+    vol_target: float = 0.15,
+    atr_period: int = 14,
+    stop_loss_atr: float = 2.5,
     gross_exposure: float = 0.8,
 ) -> Callable:
     """Factory function to create trend-following allocator for backtesting."""

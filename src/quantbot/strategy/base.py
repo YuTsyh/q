@@ -47,12 +47,12 @@ class AllocatorStrategyAdapter:
         Prefix for generated ``client_order_id`` values.
 
     .. note::
-       Bars built from snapshots will have ``volume=0`` because tick-level
-       volume is not available via :class:`MarketSnapshot`.  If the
-       downstream backtest engine uses volume-dependent market impact
-       (``use_market_impact=True``), the impact model will treat volumes
-       as zero and produce zero slippage.  This is acceptable for live
-       trading where actual exchange order books handle execution.
+       Bars aggregate ``last_volume`` from incoming
+       :class:`MarketSnapshot` ticks.  When the exchange provides volume
+       data (e.g. OKX ``volCcy24h``), the resulting bars will carry
+       realistic volume estimates.  If the snapshot ``last_volume`` is
+       zero (e.g. during unit tests), the bar volume will also be zero;
+       the market-impact model applies a fallback in that case.
     """
 
     def __init__(
@@ -82,6 +82,7 @@ class AllocatorStrategyAdapter:
         self._bar_high: dict[str, Decimal] = {}
         self._bar_low: dict[str, Decimal] = {}
         self._bar_start_ts: dict[str, float] = {}
+        self._bar_volume: dict[str, Decimal] = {}  # cumulative volume
 
         self._bar_count = 0
         self._seq = 1
@@ -94,16 +95,19 @@ class AllocatorStrategyAdapter:
 
         price = snapshot.last_price
         ts_epoch = snapshot.received_at.timestamp()
+        tick_volume = snapshot.last_volume
 
-        # Update intra-bar OHLC
+        # Update intra-bar OHLC and accumulate volume
         if inst_id not in self._bar_open:
             self._bar_open[inst_id] = price
             self._bar_high[inst_id] = price
             self._bar_low[inst_id] = price
             self._bar_start_ts[inst_id] = ts_epoch
+            self._bar_volume[inst_id] = tick_volume
         else:
             self._bar_high[inst_id] = max(self._bar_high[inst_id], price)
             self._bar_low[inst_id] = min(self._bar_low[inst_id], price)
+            self._bar_volume[inst_id] += tick_volume
 
         # Check if bar is complete
         if ts_epoch - self._bar_start_ts.get(inst_id, ts_epoch) < self._bar_interval:
@@ -117,7 +121,7 @@ class AllocatorStrategyAdapter:
             high=self._bar_high[inst_id],
             low=self._bar_low[inst_id],
             close=price,
-            volume=Decimal("0"),  # Volume not available from snapshots
+            volume=self._bar_volume.get(inst_id, Decimal("0")),
         )
         self._bars[inst_id].append(bar)
         # Reset intra-bar state
@@ -125,6 +129,7 @@ class AllocatorStrategyAdapter:
         del self._bar_high[inst_id]
         del self._bar_low[inst_id]
         del self._bar_start_ts[inst_id]
+        self._bar_volume.pop(inst_id, None)
 
         self._bar_count += 1
         if self._bar_count % self._rebalance_n != 0:

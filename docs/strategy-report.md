@@ -2,26 +2,46 @@
 
 ## Executive Summary
 
-This document presents a robust quantitative trading strategy developed
-for the OKX perpetual swap market, validated through rigorous backtesting
-including walk-forward analysis, Monte Carlo simulation, and stress testing.
+> **⚠️ IMPORTANT DISCLOSURE**: All performance metrics in this document
+> were generated using **synthetic data** (`synthetic_data.py`) and
+> **do not represent real market performance**.  These numbers have
+> zero predictive value for live trading.  Strategy validation on real
+> historical data is required before any deployment.
 
-**PRIMARY STRATEGY: Volatility-Adjusted Trend Following** — PASSED ALL CRITERIA
+This document describes the quantitative trading strategies developed
+for the OKX perpetual swap market.  The validation framework includes
+walk-forward analysis, Monte Carlo simulation, and stress testing,
+but **all historical validation must be re-run on real exchange data**
+before any deployment decision.
 
-| Metric | Threshold | Achieved | Status |
-|--------|-----------|----------|--------|
-| Sharpe Ratio | ≥ 1.5 | **1.53** | ✓ PASS |
-| Max Drawdown | ≤ 25% | **14.0%** | ✓ PASS |
-| Profit Factor | ≥ 1.5 | **1.75** | ✓ PASS |
-| Expectancy | > 0 | **0.0034** | ✓ PASS |
-| OOS Sharpe | ≥ 1.0 | **1.85** | ✓ PASS |
-| MC P5 Sharpe | > 0 | **1.53** | ✓ PASS |
-| Stress Max DD | ≤ 35% | **14.5%** | ✓ PASS |
+### Strategy Status Matrix
 
-Additional strategies (Adaptive Dual Momentum, Ensemble) are provided
-as alternatives for different market conditions.
+| Strategy | Status | Reason |
+|----------|--------|--------|
+| Trend Following | ✅ **Active** | Best overall signal; params tuned for crypto volatility |
+| Adaptive Dual Momentum | ✅ **Active** | Multi-factor approach; params relaxed for lower churn |
+| Ensemble Momentum-Trend | ✅ **Active** | 2-of-3 consensus mechanism; lower false-positive rate |
+| Mean Reversion (Markov) | ✅ **Active** | Circuit breakers relaxed for crypto-scale moves |
+| Microstructure Flow | ❌ **Deprecated** | Requires L2/L3 order book data; OHLCV insufficient |
+| Cross-Sectional Arb | ❌ **Deprecated** | Spot-only rotation generates excessive turnover fees |
+| Vol Mean Reversion | ❌ **Deprecated** | GK vol signal too weak at daily OHLCV resolution |
+| Regime Switching | ❌ **Deprecated** | Regime classifier lags crypto market speed |
+
+### Key Fixes Applied (v0.2)
+
+1. **Volume=0 Bug Fixed**: `AllocatorStrategyAdapter` now tracks
+   cumulative volume from `MarketSnapshot` ticks (OKX `volCcy24h`)
+2. **Market Impact Fallback**: When `bar_volume=0`, uses ADV × 5%
+   as fallback instead of returning zero slippage
+3. **Strategy Parameters**: All active strategies re-tuned with
+   wider stops, longer lookbacks, and cooldown mechanisms
+4. **Tiered Drawdown Scaling**: Kill switch replaced with graduated
+   exposure reduction (10% DD → 50%, 15% DD → 25%, 20% DD → flat)
+5. **Real Data Downloader**: `research/real_data.py` provides OKX
+   historical OHLCV and funding rate download with CSV caching
 
 ---
+
 
 ## Strategy 1: Adaptive Dual Momentum
 

@@ -105,7 +105,8 @@ class TestComputeMarketImpact:
         assert result.was_capped
         assert result.volume_participation_rate == pytest.approx(0.05)
 
-    def test_zero_volume_returns_zero_impact(self) -> None:
+    def test_zero_volume_uses_adv_fallback(self) -> None:
+        """When bar_volume=0 but ADV>0, use ADV-based fallback (non-zero impact)."""
         cfg = MarketImpactConfig()
         result = compute_market_impact(
             trade_notional=Decimal("10000"),
@@ -114,20 +115,26 @@ class TestComputeMarketImpact:
             adv=Decimal("1000000"),
             config=cfg,
         )
-        assert result.total_slippage == _ZERO
-        assert result.effective_price == Decimal("100")
-        assert not result.was_capped
+        # With ADV fallback, slippage should NOT be zero
+        assert result.total_slippage != _ZERO
+        assert result.total_cost > _ZERO
+        assert result.taker_fee > _ZERO
 
-    def test_zero_adv_returns_zero_impact(self) -> None:
+    def test_zero_adv_and_volume_returns_fee_only(self) -> None:
+        """When both volume=0 and ADV=0, only taker fee is charged."""
         cfg = MarketImpactConfig()
         result = compute_market_impact(
             trade_notional=Decimal("10000"),
             price=Decimal("100"),
-            bar_volume=Decimal("500000"),
+            bar_volume=Decimal("0"),
             adv=Decimal("0"),
             config=cfg,
         )
+        # No slippage possible without any volume data
         assert result.total_slippage == _ZERO
+        # But taker fee should still be charged
+        assert result.taker_fee > _ZERO
+        assert result.total_cost == result.taker_fee
 
     def test_zero_notional_returns_zero_impact(self) -> None:
         cfg = MarketImpactConfig()

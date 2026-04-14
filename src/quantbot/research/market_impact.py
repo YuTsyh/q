@@ -14,6 +14,7 @@ References
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
@@ -23,6 +24,9 @@ from quantbot.research.data import OhlcvBar
 _ZERO = Decimal("0")
 _ONE = Decimal("1")
 _QUANTIZE_PRICE = Decimal("0.00000001")
+_ADV_VOLUME_FALLBACK_RATIO = Decimal("0.05")  # When bar_volume=0, use 5% of ADV
+
+_logger = logging.getLogger(__name__)
 
 
 def _sign(value: Decimal) -> int:
@@ -168,7 +172,7 @@ def compute_market_impact(
     sign = _sign(trade_notional)
 
     # --- handle degenerate volume -----------------------------------------
-    if bar_volume <= _ZERO or adv <= _ZERO or abs_notional == _ZERO:
+    if abs_notional == _ZERO:
         return MarketImpactResult(
             temporary_impact=_ZERO,
             permanent_impact=_ZERO,
@@ -182,8 +186,40 @@ def compute_market_impact(
             was_capped=False,
         )
 
+    # Volume fallback: when bar_volume is zero, use ADV * ratio as proxy
+    effective_bar_volume = bar_volume
+    if bar_volume <= _ZERO:
+        if adv > _ZERO:
+            effective_bar_volume = adv * _ADV_VOLUME_FALLBACK_RATIO
+            _logger.warning(
+                "bar_volume=0 for trade_notional=%s, using ADV fallback=%s",
+                trade_notional, effective_bar_volume,
+            )
+        else:
+            # Both bar_volume and ADV are zero — apply flat penalty
+            _logger.warning(
+                "Both bar_volume and ADV are zero; applying taker fee only"
+            )
+            taker_fee = (abs_notional * config.taker_fee_rate).quantize(
+                _QUANTIZE_PRICE, rounding=ROUND_HALF_UP
+            )
+            return MarketImpactResult(
+                temporary_impact=_ZERO,
+                permanent_impact=_ZERO,
+                total_slippage=_ZERO,
+                effective_price=price,
+                maker_fee=_ZERO,
+                taker_fee=taker_fee,
+                funding_cost=_ZERO,
+                total_cost=taker_fee,
+                volume_participation_rate=0.0,
+                was_capped=False,
+            )
+
+    effective_adv = adv if adv > _ZERO else effective_bar_volume
+
     # --- volume participation rate ----------------------------------------
-    volume_notional = price * bar_volume
+    volume_notional = price * effective_bar_volume
     raw_participation = float(abs_notional / volume_notional)
     was_capped = raw_participation > config.max_volume_participation
     participation_rate = min(raw_participation, config.max_volume_participation)
@@ -198,7 +234,7 @@ def compute_market_impact(
     ).quantize(_QUANTIZE_PRICE, rounding=ROUND_HALF_UP)
 
     # --- permanent impact -------------------------------------------------
-    adv_notional = price * adv
+    adv_notional = price * effective_adv
     adv_ratio = float(abs_notional / adv_notional)
     perm_basis = adv_ratio ** config.impact_exponent
     permanent_impact = (

@@ -41,6 +41,7 @@ class MarketSnapshot:
     inst_id: str
     last_price: Decimal
     received_at: datetime
+    last_volume: Decimal = Decimal("0")
 
 
 @dataclass(frozen=True)

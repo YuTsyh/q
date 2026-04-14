@@ -1,13 +1,23 @@
-"""Synthetic market data generator for backtesting.
+"""Synthetic OHLCV and Funding Rate data generator for **unit tests only**.
 
-Generates realistic OHLCV and funding rate data with configurable
-market regimes (bull, bear, sideways, volatile).
+.. warning::
+   **DO NOT use this module for strategy performance evaluation or
+   validation.**  Synthetic data generators produce idealised price
+   dynamics (GBM with regime overlays) that do not reproduce the
+   distributional properties of real crypto markets: fat tails,
+   volatility clustering, microstructure noise, and liquidity gaps.
 
-The generator supports:
-- Fat tails via Student-t innovations (configurable degrees of freedom)
-- Volatility clustering via GARCH(1,1)-style conditional variance
-- Jump diffusion (Poisson jumps with log-normal jump sizes)
-- Cross-asset correlation via Cholesky decomposition
+   Any "Sharpe" or "CAGR" computed on synthetic data is meaningless
+   for predicting live trading performance.
+
+   For strategy validation, use :mod:`quantbot.research.real_data`
+   to download actual historical OHLCV and funding rate data from
+   exchanges such as OKX.
+
+This module is **appropriate** for:
+- Unit testing strategy logic (does allocate() return correct types?)
+- Integration testing the backtest engine pipeline
+- Verifying risk overlay and market impact model mechanics
 
 References:
 - Bollerslev (1986) "Generalized Autoregressive Conditional

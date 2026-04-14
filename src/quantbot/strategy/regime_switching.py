@@ -1,5 +1,19 @@
 """Regime-Switching Cross-Sectional Alpha Strategy.
 
+.. deprecated::
+   This strategy is **DEPRECATED** and should not be used for live trading.
+   The vol-ratio + SMA-slope regime classifier has excessive lag in
+   crypto markets, causing the strategy to detect regime changes only
+   after the move has completed.  Combined with a 5% circuit breaker
+   that triggers too frequently, the strategy enters and exits at the
+   worst possible times.
+
+   In OOS backtests with realistic friction costs, this strategy produced
+   CAGR of -0.14% — effectively break-even before accounting for
+   opportunity cost.
+
+   **Status**: Archived.  Needs fundamental redesign with faster regime
+   detection (e.g. online change-point detection) before reactivation.
 A novel strategy that adaptively switches between alpha signals
 depending on the detected market regime. Unlike existing strategies
 that are purely trend/momentum based, this strategy combines:

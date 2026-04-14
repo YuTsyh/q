@@ -1,5 +1,17 @@
 """Volatility Mean-Reversion Strategy with Garman-Klass Estimator.
 
+.. deprecated::
+   This strategy is **DEPRECATED** and should not be used for live trading.
+   The Garman-Klass volatility mean-reversion signal is too weak at daily
+   OHLCV resolution to overcome transaction costs.  In OOS backtests,
+   this strategy produced CAGR of only 0.23% — essentially working
+   entirely for the exchange in fees.
+
+   The core thesis (vol is mean-reverting) is sound, but exploiting it
+   requires higher-frequency data (1m/5m bars) and tighter execution
+   than the current OHLCV-based framework supports.
+
+   **Status**: Archived.  Do not deploy.  Retained for reference only.
 A novel spot-only strategy that exploits the mean-reverting nature of
 volatility in crypto markets. Unlike existing strategies in this repository
 that focus on price-based signals, this strategy treats volatility itself

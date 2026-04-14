@@ -18,9 +18,12 @@ class OkxTickerParser:
 
         row = message["data"][0]
         timestamp_ms = int(row["ts"])
+        # Extract volume: prefer volCcy24h (quote-currency volume), fallback to vol24h
+        raw_vol = row.get("volCcy24h") or row.get("vol24h") or "0"
         return MarketSnapshot(
             inst_id=row["instId"],
             last_price=Decimal(row["last"]),
             received_at=datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC),
+            last_volume=Decimal(raw_vol),
         )
 

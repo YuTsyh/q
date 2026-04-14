@@ -13,6 +13,7 @@ Supports:
 from __future__ import annotations
 
 import random
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -119,6 +120,23 @@ class BacktestEngine:
         all_timestamps = _common_timestamps(bars_by_instrument)
         if len(all_timestamps) < min_history + 1:
             raise ValueError("Not enough common bars for backtest")
+
+        # Volume sanity check
+        _zero = Decimal("0")
+        all_zero_vol = all(
+            b.volume == _zero
+            for bars in bars_by_instrument.values()
+            for b in bars
+        )
+        if all_zero_vol:
+            warnings.warn(
+                "All bars have volume=0. Market-impact slippage will use "
+                "ADV-based fallback estimates which may understate real "
+                "friction. Consider using real historical OHLCV data with "
+                "volume for accurate backtest results.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         equity = self._config.initial_equity
         equity_curve = [equity]

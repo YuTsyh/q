@@ -1,5 +1,17 @@
 """Cross-Sectional Statistical Arbitrage — Relative Value with Dynamic Clustering.
 
+.. deprecated::
+   This strategy is **DEPRECATED** and should not be used for live trading.
+   In crypto spot-only mode (no shorting), pure cross-sectional rotation
+   generates excessive bilateral turnover fees that overwhelm the weak
+   relative-value signal.  Without proper funding-rate arbitrage
+   (basis trading), the strategy's edge is insufficient.
+
+   In OOS backtests with realistic friction costs, this strategy produced
+   CAGR of -5.26%.  The volume-weighted market-return decomposition also
+   fails when bar volumes are zero (from snapshot-built bars).
+
+   **Status**: Archived.  Do not deploy.  Retained for reference only.
 A pure cross-sectional strategy that ranks **all** instruments against each
 other using relative signals, then longs the top-decile assets while
 avoiding the bottom-decile.  Because OKX Spot Demo (tdMode=cash) does not

@@ -1,5 +1,19 @@
 """Microstructure / Order Flow with Funding Rate Spillover Strategy.
 
+.. deprecated::
+   This strategy is **DEPRECATED** and should not be used for live trading.
+   It claims to exploit microstructure signals but only uses OHLCV K-line
+   data, which is far too coarse for genuine order-flow analysis.  Real
+   microstructure strategies require L2/L3 order book depth data and
+   tick-level trade flow.  Using OHLCV bars for microstructure is like
+   using a telescope to look at bacteria.
+
+   In OOS backtests with realistic friction costs, this strategy produced
+   CAGR of -8.56% — the worst of all strategies.  Volume decomposition
+   from OHLCV (buy/sell pressure proxy) is a rough heuristic that does
+   not survive transaction costs.
+
+   **Status**: Archived.  Do not deploy.  Retained for reference only.
 A spot-only strategy that exploits **high-frequency microstructure proxies**
 derived from OHLCV data, combined with **perpetual funding-rate spillover**
 signals to capture short-term inefficiencies caused by information asymmetry

@@ -25,7 +25,14 @@ class LiveRiskConfig:
     max_position_pct: Decimal = Decimal("0.25")  # 25% max single position
     max_open_orders: int = 10
     kill_switch_cooldown: timedelta = timedelta(hours=1)
-    max_drawdown_pct: Decimal = Decimal("0.15")  # 15% max DD kill switch
+    max_drawdown_pct: Decimal = Decimal("0.25")  # 25% max DD kill switch
+    # Tiered drawdown scaling: (dd_threshold, exposure_multiplier)
+    # At 10% DD → keep 50% exposure, at 15% → keep 25%, at 20%+ → full flat
+    dd_tiers: tuple[tuple[float, float], ...] = (
+        (0.10, 0.50),  # 10% DD → 50% exposure
+        (0.15, 0.25),  # 15% DD → 25% exposure
+        (0.20, 0.0),   # 20% DD → flat
+    )
 
 
 @dataclass
@@ -74,6 +81,26 @@ class LiveRiskManager:
             drawdown = (self._peak_equity - equity) / self._peak_equity
             if drawdown >= self.config.max_drawdown_pct:
                 self.activate_kill_switch("max_drawdown_exceeded")
+
+    def get_drawdown_exposure_scale(self) -> float:
+        """Return exposure multiplier based on tiered drawdown levels.
+
+        Provides graduated de-risking instead of a binary kill switch.
+        Strategies should multiply their target weights by this value.
+
+        Returns
+        -------
+        float
+            Exposure multiplier between 0.0 and 1.0.
+        """
+        dd = float(self.current_drawdown)
+        # Tiers must be sorted ascending by threshold
+        # Find the highest tier that the current DD exceeds
+        scale = 1.0
+        for threshold, multiplier in self.config.dd_tiers:
+            if dd >= threshold:
+                scale = multiplier
+        return scale
 
     def compute_position_size(
         self,

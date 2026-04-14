@@ -108,7 +108,7 @@ class MeanReversionMarkovConfig:
     w_obv: float = 0.15
 
     # -- Entry / exit thresholds -------------------------------------------
-    entry_z_threshold: float = 0.15  # composite > this → enter long
+    entry_z_threshold: float = 0.10  # composite > this → enter long
     exit_z_threshold: float = -0.05  # composite < this → exit
 
     # -- Position sizing ---------------------------------------------------
@@ -132,10 +132,10 @@ class MeanReversionMarkovConfig:
     crisis_exposure: float = 0.0  # CRISIS → flat
 
     # -- Drawdown circuit breaker ------------------------------------------
-    dd_threshold: float = 0.05  # start scaling at 5 % rolling DD
+    dd_threshold: float = 0.08  # start scaling at 8% rolling DD
     dd_window: int = 60  # bars for rolling peak
     circuit_breaker_lookback: int = 5
-    circuit_breaker_drop: float = 0.05  # single-instrument crash guard
+    circuit_breaker_drop: float = 0.08  # single-instrument crash guard
 
     # -- Top-N selection ---------------------------------------------------
     top_n: int = 3

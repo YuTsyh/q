@@ -104,9 +104,9 @@ class AdaptiveDualMomentumStrategy:
         cls,
         *,
         top_n: int = 3,
-        gross_exposure: Decimal = Decimal("0.7"),
-        momentum_lookback: int = 5,
-        vol_lookback: int = 10,
+        gross_exposure: Decimal = Decimal("0.5"),
+        momentum_lookback: int = 14,
+        vol_lookback: int = 15,
     ) -> AdaptiveDualMomentumStrategy:
         """Create strategy with default parameters."""
         return cls(
@@ -130,7 +130,7 @@ class AdaptiveDualMomentumStrategy:
                 max_symbol_weight=Decimal("0.25"),
             ),
             vol_lookback=vol_lookback,
-            trend_filter_threshold=Decimal("0.3"),
+            trend_filter_threshold=Decimal("0.25"),
         )
 
     def allocate(
@@ -229,9 +229,9 @@ class AdaptiveDualMomentumStrategy:
 
 def create_adaptive_dual_momentum_allocator(
     top_n: int = 3,
-    gross_exposure: float = 0.7,
-    momentum_lookback: int = 5,
-    vol_lookback: int = 10,
+    gross_exposure: float = 0.5,
+    momentum_lookback: int = 14,
+    vol_lookback: int = 15,
 ) -> Callable:
     """Factory function to create an allocator callable for backtesting."""
     strategy = AdaptiveDualMomentumStrategy.default(

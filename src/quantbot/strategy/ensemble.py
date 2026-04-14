@@ -33,21 +33,23 @@ from quantbot.research.regime import MarketRegimeType, classify_regime
 class EnsembleConfig:
     """Configuration for ensemble strategy."""
 
-    fast_ema: int = 3
-    slow_ema: int = 10
-    momentum_lookback: int = 7
+    fast_ema: int = 5
+    slow_ema: int = 12
+    momentum_lookback: int = 10
     vol_lookback: int = 15
     atr_period: int = 10
     trend_ma_lookbacks: tuple[int, ...] = (3, 7, 14)
-    min_trend_strength: float = 0.5  # At least half of MAs must confirm
+    min_trend_strength: float = 0.35  # At least 35% of MAs must confirm
     vol_target: float = 0.18
     max_position_weight: float = 0.20
     gross_exposure: float = 0.7
-    stop_loss_atr_multiple: float = 1.5
+    stop_loss_atr_multiple: float = 2.0
     top_n: int = 3  # Max instruments
     use_regime_filter: bool = True
     crash_lookback: int = 3
-    crash_threshold: float = -0.04
+    crash_threshold: float = -0.06
+    # Consensus mode: require at least this many signals out of 3
+    min_consensus_signals: int = 2
 
 
 def _ema(values: list[float], period: int) -> list[float]:
@@ -123,20 +125,25 @@ class EnsembleMomentumTrend:
 
             current_price = closes[-1]
 
+            # --- Collect signal votes for 2-of-3 consensus ---
+            signal_votes = 0
+
             # --- Signal 1: EMA Crossover ---
             fast_ema = _ema(closes, cfg.fast_ema)
             slow_ema = _ema(closes, cfg.slow_ema)
             ema_signal = fast_ema[-1] > slow_ema[-1]
-            if not ema_signal:
-                continue  # Skip if no trend
+            if ema_signal:
+                signal_votes += 1
 
             # --- Signal 2: Absolute Momentum ---
             lookback_price = closes[-(cfg.momentum_lookback + 1)]
-            if lookback_price <= 0:
+            abs_momentum = 0.0
+            if lookback_price > 0:
+                abs_momentum = (current_price / lookback_price) - 1.0
+                if abs_momentum > 0:
+                    signal_votes += 1
+            else:
                 continue
-            abs_momentum = (current_price / lookback_price) - 1.0
-            if abs_momentum <= 0:
-                continue  # Skip if negative absolute momentum
 
             # --- Signal 3: Trend Strength ---
             above_count = 0
@@ -146,8 +153,12 @@ class EnsembleMomentumTrend:
                     if current_price > sma:
                         above_count += 1
             trend_strength = above_count / len(cfg.trend_ma_lookbacks)
-            if trend_strength < cfg.min_trend_strength:
-                continue  # Skip if trend not confirmed
+            if trend_strength >= cfg.min_trend_strength:
+                signal_votes += 1
+
+            # --- Consensus gate: need min_consensus_signals ---
+            if signal_votes < cfg.min_consensus_signals:
+                continue
 
             # --- Signal 4: ATR Stop Check ---
             atr = _compute_atr(bars, cfg.atr_period)
@@ -241,14 +252,14 @@ class EnsembleMomentumTrend:
 
 
 def create_ensemble_allocator(
-    fast_ema: int = 3,
-    slow_ema: int = 10,
-    momentum_lookback: int = 7,
+    fast_ema: int = 5,
+    slow_ema: int = 12,
+    momentum_lookback: int = 10,
     vol_target: float = 0.18,
-    stop_loss_atr: float = 1.5,
+    stop_loss_atr: float = 2.0,
     top_n: int = 3,
     gross_exposure: float = 0.7,
-    min_trend_strength: float = 0.5,
+    min_trend_strength: float = 0.35,
 ) -> Callable:
     """Factory function to create ensemble allocator for backtesting."""
     config = EnsembleConfig(

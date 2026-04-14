@@ -105,7 +105,8 @@ class TestAlmgrenChrissImpact:
         ratio = abs(big.total_slippage) / abs(base.total_slippage)
         assert ratio < 10.0, "Impact should be sub-linear (square-root law)"
 
-    def test_zero_volume_returns_zero_impact(self):
+    def test_zero_volume_and_adv_charges_fee(self):
+        """When both volume and ADV are zero, taker fee is still charged."""
         cfg = MarketImpactConfig()
         result = compute_market_impact(
             trade_notional=Decimal("1000"),
@@ -115,6 +116,9 @@ class TestAlmgrenChrissImpact:
             config=cfg,
         )
         assert result.total_slippage == _ZERO
+        # Taker fee should still be charged even without volume data
+        assert result.taker_fee > _ZERO
+        assert result.total_cost == result.taker_fee
 
     def test_buy_impact_positive_sell_negative(self):
         """Buys should push price up, sells should push price down."""
