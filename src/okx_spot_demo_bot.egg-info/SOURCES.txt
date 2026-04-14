@@ -55,6 +55,7 @@ src/quantbot/strategy/ensemble.py
 src/quantbot/strategy/mean_reversion_markov.py
 src/quantbot/strategy/microstructure_flow.py
 src/quantbot/strategy/regime_switching.py
+src/quantbot/strategy/risk_overlay.py
 src/quantbot/strategy/trend_following.py
 src/quantbot/strategy/vol_mean_reversion.py
 tests/test_adaptive_momentum.py
@@ -66,6 +67,7 @@ tests/test_engine.py
 tests/test_enhanced_features.py
 tests/test_ensemble.py
 tests/test_execution_simulator.py
+tests/test_framework_audit.py
 tests/test_instruments.py
 tests/test_live_feasibility.py
 tests/test_live_risk.py
@@ -80,6 +82,7 @@ tests/test_okx_auth.py
 tests/test_okx_rest_client.py
 tests/test_okx_trade_adapter.py
 tests/test_okx_ws.py
+tests/test_oos_backtest.py
 tests/test_orchestrator.py
 tests/test_order_state.py
 tests/test_persistence.py
@@ -91,6 +94,7 @@ tests/test_research_data.py
 tests/test_research_factors.py
 tests/test_research_metrics.py
 tests/test_risk.py
+tests/test_risk_overlay.py
 tests/test_robustness.py
 tests/test_stablecoin_hedge.py
 tests/test_strategy.py
